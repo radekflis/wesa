@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Adaptive Layered AI Workflowstation</title>
+    <meta
+      name="description"
+      content="A contextual layered workspace engine for AI-native knowledge work."
+    />
+    <meta name="theme-color" content="#f8fbff" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Adaptive Layered AI Workflowstation" />
+    <meta
+      property="og:description"
+      content="A contextual layered workspace engine for AI-native knowledge work."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%232563eb'/%3E%3Cpath d='M18 34h28M32 18v28' stroke='white' stroke-width='6' stroke-linecap='round'/%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <nav class="topbar" aria-label="Primary">
+        <a class="brand" href="#hero" aria-label="Adaptive Layered AI Workflowstation home">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span>Workflowstation</span>
+        </a>
+        <div class="nav-links">
+          <a href="#layers">Layers</a>
+          <a href="#wormhole">Wormhole</a>
+          <a href="#prototype">Prototype</a>
+        </div>
+      </nav>
+
+      <section class="hero" id="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Operating system for knowledge work</p>
+          <h1>Adaptive Layered AI Workflowstation</h1>
+          <p class="hero-text">
+            A contextual layered workspace engine that combines live documents,
+            semantic memory, browser-grade ergonomics, and contextual AI orchestration
+            inside one continuous operational environment.
+          </p>
+          <div class="hero-actions" aria-label="Primary actions">
+            <a class="button primary" href="#prototype">Explore workspace</a>
+            <a class="button secondary" href="#layers">View architecture</a>
+          </div>
+        </div>
+
+        <div class="workstation-card" aria-label="Adaptive workspace preview">
+          <div class="window-bar">
+            <span></span><span></span><span></span>
+            <p>lithium valuation OCR</p>
+          </div>
+          <div class="workspace-grid">
+            <article class="panel document-panel">
+              <p class="panel-label">PDF Viewer</p>
+              <h2>Geological Report</h2>
+              <div class="scan-lines" aria-hidden="true"></div>
+            </article>
+            <article class="panel ai-panel">
+              <p class="panel-label">Valuation AI</p>
+              <h2>Contextual overlay</h2>
+              <ul>
+                <li>Detects lithium grade tables</li>
+                <li>Maps sources to valuation sections</li>
+                <li>Suggests live insertions</li>
+              </ul>
+            </article>
+            <article class="panel spreadsheet-panel">
+              <p class="panel-label">Extractor</p>
+              <h2>Structured outputs</h2>
+              <div class="mini-table" aria-hidden="true">
+                <span>Source</span><span>Grade</span><span>Confidence</span>
+                <span>OCR-14</span><span>1.8%</span><span>94%</span>
+                <span>OCR-22</span><span>2.1%</span><span>91%</span>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="layers">
+        <div class="section-heading">
+          <p class="eyebrow">Core architecture</p>
+          <h2>Three adaptive layers, one operational context.</h2>
+        </div>
+        <div class="layer-grid">
+          <article class="layer-card">
+            <span class="layer-number">01</span>
+            <h3>Document layer</h3>
+            <p>
+              Live semantic storage with folder structures, metadata, OCR indexing,
+              synchronization, and contextual search. Every artifact becomes part of
+              active memory.
+            </p>
+          </article>
+          <article class="layer-card">
+            <span class="layer-number">02</span>
+            <h3>Live workspace layer</h3>
+            <p>
+              An editable, modular, AI-reactive surface where tools, documents,
+              browser tabs, diagrams, and collaborative views appear contextually.
+            </p>
+          </article>
+          <article class="layer-card">
+            <span class="layer-number">03</span>
+            <h3>Contextual AI layer</h3>
+            <p>
+              AI appears where needed as overlays, inline transformations, semantic
+              assistants, and live operational agents instead of a permanent chat pane.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="wormhole" id="wormhole">
+        <div>
+          <p class="eyebrow">Signature interaction</p>
+          <h2>Wormhole interactions bridge work without app switching.</h2>
+          <p>
+            Drag a geological PDF onto an active valuation document and the system
+            detects intent, launches OCR, extracts structured information, maps findings,
+            proposes insertions, and updates the document in real time.
+          </p>
+        </div>
+        <ol class="flow-list">
+          <li>Intent detected</li>
+          <li>OCR launched</li>
+          <li>Sources mapped</li>
+          <li>Document mutated</li>
+        </ol>
+      </section>
+
+      <section class="prototype" id="prototype">
+        <div class="section-heading">
+          <p class="eyebrow">Semantic workspace spawning</p>
+          <h2>Search returns operational environments, not only files.</h2>
+        </div>
+        <div class="search-simulator" role="region" aria-label="Semantic workspace simulator">
+          <label for="workflow-query">Workflow intent</label>
+          <div class="search-row">
+            <input id="workflow-query" value="lithium valuation OCR" />
+            <button id="spawn-workspace" type="button">Spawn workspace</button>
+          </div>
+          <div class="spawn-output" id="spawn-output" aria-live="polite"></div>
+        </div>
+      </section>
+    </main>
+    <script src="script.js"></script>
+  </body>
+</html>
