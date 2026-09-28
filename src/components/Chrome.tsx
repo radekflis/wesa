@@ -6,6 +6,7 @@ import { useActions } from '../lib/actions';
 import { PROVIDER_LABEL, providerReady } from '../lib/ai';
 import { search } from '../lib/extract';
 import type { ProviderId } from '../lib/types';
+import { askConfirm, askText } from './Dialogs';
 
 export function TopBar({ onPalette, onSettings }: { onPalette: () => void; onSettings: () => void }) {
   const { state, dispatch } = useStore();
@@ -51,9 +52,9 @@ export function TopBar({ onPalette, onSettings }: { onPalette: () => void; onSet
               )}
               <button
                 className="text-slate-300 opacity-0 hover:text-slate-900 group-hover:opacity-100"
-                onClick={(e) => {
+                onClick={async (e) => {
                   e.stopPropagation();
-                  if (t.blocks.length === 0 || confirm(`Zamknąć kontekst „${t.title}”?`)) dispatch({ type: 'tab/close', id: t.id });
+                  if (t.blocks.length === 0 || (await askConfirm(`Zamknąć kontekst „${t.title}”?`, { okLabel: 'Zamknij' }))) dispatch({ type: 'tab/close', id: t.id });
                 }}
                 aria-label="Zamknij kartę"
               >
@@ -79,17 +80,25 @@ export function TopBar({ onPalette, onSettings }: { onPalette: () => void; onSet
         ⌕
       </button>
       <button
-        className="btn hidden sm:inline-flex"
+        className="btn shrink-0"
         title="Wyczyść pliki, foldery i dokumenty — zacznij nowy projekt"
-        onClick={() => {
+        onClick={async () => {
           const hasData = state.files.length > 0 || state.tabs.some((t) => t.blocks.length > 0);
-          if (hasData && !confirm('Rozpocząć nowy projekt? Wszystkie pliki, foldery i dokumenty z tej przeglądarki zostaną usunięte (ustawienia AI zostają). Jeśli chcesz je zachować, najpierw zrób „Eksport kopii” w ustawieniach.')) return;
-          const title = prompt('Nazwa nowego projektu', 'Nowy projekt');
+          if (
+            hasData &&
+            !(await askConfirm('Rozpocząć nowy projekt?', {
+              detail: 'Wszystkie pliki, foldery i dokumenty z tej przeglądarki zostaną usunięte (ustawienia AI zostają). Aby je zachować, najpierw zrób „Eksport kopii” w ustawieniach ⚙.',
+              okLabel: 'Wyczyść i zacznij',
+              danger: true,
+            }))
+          )
+            return;
+          const title = await askText('Nazwa nowego projektu', 'Nowy projekt', { okLabel: 'Utwórz' });
           if (title === null) return;
           dispatch({ type: 'project/new', title: title.trim() || 'Nowy projekt' });
         }}
       >
-        ✦ Nowy projekt
+        ✦ <span className="hidden sm:inline">Nowy projekt</span>
       </button>
       <button onClick={onSettings} className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] text-slate-500 hover:bg-slate-50" title="Ustawienia jądra AI">
         <span className={`h-2 w-2 rounded-full ${provider === 'local' ? 'bg-slate-300' : 'bg-emerald-500'}`} />
@@ -282,8 +291,8 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
           />
           <button
             className="btn ml-auto text-red-600"
-            onClick={() => {
-              if (confirm('Usunąć wszystkie pliki, konteksty i ustawienia z tej przeglądarki?')) {
+            onClick={async () => {
+              if (await askConfirm('Usunąć wszystkie dane?', { detail: 'Pliki, konteksty i ustawienia (także klucze API) zostaną usunięte z tej przeglądarki.', okLabel: 'Usuń wszystko', danger: true })) {
                 localStorage.clear();
                 indexedDB.deleteDatabase('wesa-alaw');
                 location.reload();

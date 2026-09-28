@@ -10,6 +10,7 @@ import { runAi, providerReady, summarize, PROVIDER_LABEL, type AiRequest } from 
 import { block, localReport, markdownToBlocks, numbersTable, planWorkspace, uid, fmt } from './spawn';
 import { pearson, type NumberToken } from './stats';
 import { demoFiles } from './demo';
+import { askConfirm } from '../components/Dialogs';
 
 function pathOf(id: string, folders: Folder[]): string[] {
   const out: string[] = [];
@@ -103,7 +104,8 @@ export function useActions() {
         toast('Brak obsługiwanych plików (PDF, obrazy, DOCX, XLSX, CSV, TXT).', 'error');
         return [];
       }
-      if (items.length > 300 && !confirm(`Import ${items.length} plików może potrwać (OCR skanów działa w przeglądarce). Kontynuować?`)) return [];
+      if (items.length > 300 && !(await askConfirm(`Zaimportować ${items.length} plików?`, { detail: 'Import może potrwać — OCR skanów działa w przeglądarce.', okLabel: 'Importuj' })))
+        return [];
 
       const created: Folder[] = [];
       const recs = items.map((it) => {

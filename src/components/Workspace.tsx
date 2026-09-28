@@ -433,9 +433,14 @@ export function Workspace() {
               <p className="mx-auto mt-2 max-w-md text-xs leading-relaxed text-slate-500">
                 Wpisz intencję w konsoli poniżej (np. <i>„raport dla inwestora — złoże niklu, wycena”</i>), przeciągnij tu plik, folder lub czerwony klocek lokautu — albo zacznij pisać.
               </p>
-              <button className="btn mt-4" onClick={() => commit([block('heading', tab.title, { level: 1, origin: 'user' }), block('text', '', { origin: 'user' })])}>
-                Zacznij pusty dokument
-              </button>
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                <button className="btn" onClick={() => commit([block('heading', tab.title, { level: 1, origin: 'user' }), block('text', '', { origin: 'user' })])}>
+                  Zacznij pusty dokument
+                </button>
+                <button className="btn" onClick={() => window.dispatchEvent(new Event('wesa:pick-files'))}>
+                  + Dodaj ZIP z Google Drive / pliki
+                </button>
+              </div>
             </div>
           )}
           {blocks.map((b, i) => (

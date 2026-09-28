@@ -4,6 +4,7 @@ import { Memory } from './components/Memory';
 import { Workspace } from './components/Workspace';
 import { Tools } from './components/Tools';
 import { CommandPalette, SettingsDialog, Toasts, TopBar } from './components/Chrome';
+import { DialogHost } from './components/Dialogs';
 
 type Pane = 'memory' | 'workspace' | 'tools';
 
@@ -61,6 +62,7 @@ export function App() {
       {palette && <CommandPalette onClose={() => setPalette(false)} />}
       {settings && <SettingsDialog onClose={() => setSettings(false)} />}
       <Toasts />
+      <DialogHost />
     </div>
   );
 }

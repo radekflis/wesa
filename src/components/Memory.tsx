@@ -4,6 +4,10 @@ import { useActions, useTokens, DRAG_MIME, type DragPayload } from '../lib/actio
 import { fromDataTransfer, fromFileList } from '../lib/folders';
 import { uid } from '../lib/spawn';
 import type { FileRec, Folder } from '../lib/types';
+import { askConfirm, askText } from './Dialogs';
+
+/** iOS/iPadOS Safari nie obsługuje wyboru całego katalogu. */
+const FOLDER_PICKER = !(/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
 
 function readPayload(e: DragEvent): DragPayload | null {
   try {
@@ -66,9 +70,9 @@ function FileRow({ f, depth }: { f: FileRec; depth: number }) {
       <button
         className="hidden text-slate-400 hover:text-red-600 group-hover:block"
         title="Usuń plik"
-        onClick={(e) => {
+        onClick={async (e) => {
           e.stopPropagation();
-          if (confirm(`Usunąć „${f.name}” z Active Memory?`)) dispatch({ type: 'file/remove', id: f.id });
+          if (await askConfirm(`Usunąć „${f.name}” z Active Memory?`, { okLabel: 'Usuń', danger: true })) dispatch({ type: 'file/remove', id: f.id });
         }}
       >
         ×
@@ -115,9 +119,9 @@ function FolderNode({ folder, depth }: { folder: Folder; depth: number }) {
         <button
           className="hidden text-xs group-hover:block"
           title="Podfolder"
-          onClick={(e) => {
+          onClick={async (e) => {
             e.stopPropagation();
-            const name = prompt('Nazwa podfolderu');
+            const name = await askText('Nazwa podfolderu', '', { okLabel: 'Utwórz' });
             if (name) dispatch({ type: 'folder/add', folder: { id: uid(), name, parentId: folder.id } });
           }}
         >
@@ -126,9 +130,9 @@ function FolderNode({ folder, depth }: { folder: Folder; depth: number }) {
         <button
           className="hidden text-xs group-hover:block"
           title="Zmień nazwę"
-          onClick={(e) => {
+          onClick={async (e) => {
             e.stopPropagation();
-            const name = prompt('Nowa nazwa', folder.name);
+            const name = await askText('Nowa nazwa folderu', folder.name, { okLabel: 'Zmień' });
             if (name) dispatch({ type: 'folder/rename', id: folder.id, name });
           }}
         >
@@ -137,9 +141,10 @@ function FolderNode({ folder, depth }: { folder: Folder; depth: number }) {
         <button
           className="hidden text-xs group-hover:block"
           title="Usuń folder (pliki wracają do katalogu głównego)"
-          onClick={(e) => {
+          onClick={async (e) => {
             e.stopPropagation();
-            if (confirm(`Usunąć folder „${folder.name}”?`)) dispatch({ type: 'folder/remove', id: folder.id });
+            if (await askConfirm(`Usunąć folder „${folder.name}”?`, { detail: 'Pliki z tego folderu wrócą do katalogu głównego.', okLabel: 'Usuń', danger: true }))
+              dispatch({ type: 'folder/remove', id: folder.id });
           }}
         >
           ×
@@ -202,7 +207,7 @@ function Lockouts() {
 
 export function Memory() {
   const { state, dispatch } = useStore();
-  const { ingest, loadDemo } = useActions();
+  const { ingest, loadDemo, toast } = useActions();
   const input = useRef<HTMLInputElement>(null);
   const dirInput = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
@@ -211,7 +216,14 @@ export function Memory() {
   // Ekran startowy w Live Workspace otwiera te same okna wyboru (zdarzenie wywoływane synchronicznie w geście kliknięcia).
   useEffect(() => {
     const pickFiles = () => input.current?.click();
-    const pickFolder = () => dirInput.current?.click();
+    const pickFolder = () => {
+      if (FOLDER_PICKER) dirInput.current?.click();
+      else {
+        // iPad/iPhone: Safari nie pozwala wybrać folderu — prowadzimy przez ZIP.
+        setDriveHelp(true);
+        toast('Na iPadzie wybierz folder jako plik ZIP (np. „Pobierz” w Google Drive) przyciskiem ↑ Pliki.');
+      }
+    };
     window.addEventListener('wesa:pick-files', pickFiles);
     window.addEventListener('wesa:pick-folder', pickFolder);
     return () => {
@@ -230,14 +242,14 @@ export function Memory() {
           <button
             className="btn px-2 py-1"
             title="Nowy pusty folder"
-            onClick={() => {
-              const name = prompt('Nazwa folderu');
+            onClick={async () => {
+              const name = await askText('Nazwa nowego folderu', '', { okLabel: 'Utwórz' });
               if (name) dispatch({ type: 'folder/add', folder: { id: uid(), name, parentId: null } });
             }}
           >
             +
           </button>
-          <button className="btn px-2 py-1" title="Wgraj cały folder z podfolderami" onClick={() => dirInput.current?.click()}>
+          <button className="btn px-2 py-1" title="Wgraj cały folder z podfolderami" onClick={() => window.dispatchEvent(new Event('wesa:pick-folder'))}>
             ↑ Folder
           </button>
           <button className="btn-primary px-2 py-1" title="Wgraj pliki lub archiwum ZIP" onClick={() => input.current?.click()}>
