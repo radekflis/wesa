@@ -149,64 +149,42 @@ function BlockView({ b, index, update, remove, move, accept, reject }: {
 
 function StartScreen({ title }: { title: string }) {
   const { loadDemo } = useActions();
-  const [help, setHelp] = useState<'none' | 'ipad' | 'zip'>('none');
   const pick = (kind: 'files' | 'folder') => window.dispatchEvent(new Event(`wesa:pick-${kind}`));
   return (
     <div className="mx-auto max-w-[560px] pt-6">
       <div className="label">Nowy projekt</div>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">{title}</h1>
-      <p className="mt-2 text-sm leading-relaxed text-slate-500">Dodaj materiały źródłowe. Pliki zostaną zindeksowane (tekst, OCR skanów), a struktura folderów odtworzona w Active Memory.</p>
+      <p className="mt-2 text-sm leading-relaxed text-slate-500">
+        Podłącz materiały źródłowe. WESA zindeksuje każdy dokument (tekst, OCR skanów, arkusze, prezentacje) i odtworzy strukturę folderów w Active Memory.
+      </p>
       <div className="mt-6 space-y-2">
-        <button onClick={() => pick('folder')} className="flex w-full items-center gap-3 rounded-xl border border-slate-900 bg-slate-900 px-4 py-3 text-left text-white transition hover:bg-slate-800">
-          <span className="grid h-8 w-8 place-items-center rounded-lg bg-orange-500 text-base text-black">▣</span>
+        <button
+          onClick={() => window.dispatchEvent(new Event('wesa:drive-open'))}
+          className="flex w-full items-center gap-3 rounded-xl border border-slate-900 bg-slate-900 px-4 py-4 text-left text-white transition active:bg-slate-700"
+        >
+          <span className="grid h-9 w-9 place-items-center rounded-lg bg-orange-500 text-base font-bold text-black">G</span>
           <span className="flex-1">
-            <span className="block text-sm font-medium">Wybierz cały folder</span>
-            <span className="block text-[11px] text-slate-300">Z podfolderami — także z Dysku Google w aplikacji Pliki</span>
+            <span className="block text-[15px] font-medium">Folder z Dysku Google</span>
+            <span className="block text-[12px] text-slate-300">Cały folder z podfolderami · Dokumenty i Arkusze Google · synchronizacja zmian</span>
           </span>
+          <span>›</span>
         </button>
-        <button className="text-[12px] text-slate-500 underline-offset-2 hover:text-slate-900 hover:underline" onClick={() => setHelp(help === 'ipad' ? 'none' : 'ipad')}>
-          {help === 'ipad' ? '▾' : '▸'} Jak wybrać folder z Google Drive na iPadzie?
-        </button>
-        {help === 'ipad' && (
-          <div className="rounded-xl border border-slate-200 p-4 text-[13px] leading-relaxed text-slate-600">
-            <ol className="list-decimal space-y-1.5 pl-5">
-              <li>
-                Jednorazowo: zainstaluj aplikację <b>Dysk Google</b> i zaloguj się. W aplikacji <b>Pliki</b> → <b>Przeglądaj</b> → <b>⋯</b> → <b>Edycja</b> włącz <b>Dysk</b>.
-              </li>
-              <li>
-                Stuknij <b>„Wybierz cały folder”</b> powyżej → <b>Przeglądaj</b> → <b>Dysk</b>.
-              </li>
-              <li>
-                Wejdź <i>do</i> folderu projektu i stuknij <b>Otwórz</b> — zaimportuje się cały folder z podfolderami.
-              </li>
-            </ol>
-            <p className="mt-2 text-[11px] text-slate-400">Wymaga iPadOS 18.4 lub nowszego. Na starszym systemie zaznacz pliki w folderze przez „Wybierz” → „Zaznacz wszystko”.</p>
-          </div>
-        )}
-        <div className="grid grid-cols-2 gap-2 pt-1">
-          <button onClick={() => pick('files')} className="rounded-xl border border-slate-200 px-4 py-3 text-left transition hover:border-slate-400">
-            <span className="block text-sm font-medium">Pojedyncze pliki</span>
-            <span className="block text-[11px] text-slate-500">PDF, skany, DOCX, XLSX, CSV</span>
+        <div className="grid grid-cols-2 gap-2">
+          <button onClick={() => pick('folder')} className="rounded-xl border border-slate-200 px-4 py-3 text-left transition active:bg-slate-50">
+            <span className="block text-sm font-medium">Folder z urządzenia</span>
+            <span className="block text-[11px] text-slate-500">komputer · iPad (iPadOS 18.4+)</span>
           </button>
-          <button onClick={() => setHelp(help === 'zip' ? 'none' : 'zip')} className="rounded-xl border border-slate-200 px-4 py-3 text-left transition hover:border-slate-400">
-            <span className="block text-sm font-medium">Archiwum ZIP</span>
-            <span className="block text-[11px] text-slate-500">np. folder pobrany z drive.google.com</span>
+          <button onClick={() => pick('files')} className="rounded-xl border border-slate-200 px-4 py-3 text-left transition active:bg-slate-50">
+            <span className="block text-sm font-medium">Pliki lub ZIP</span>
+            <span className="block text-[11px] text-slate-500">PDF, skany, DOCX, XLSX, PPTX, CSV</span>
           </button>
         </div>
-        {help === 'zip' && (
-          <div className="rounded-xl border border-slate-200 p-4 text-[13px] leading-relaxed text-slate-600">
-            Na komputerze: <b>drive.google.com</b> → prawy przycisk na folderze → <b>Pobierz</b>. Potem wybierz ZIP:
-            <button className="btn-primary ml-2" onClick={() => pick('files')}>
-              Wybierz ZIP
-            </button>
-          </div>
-        )}
       </div>
       <p className="mt-4 text-[11px] text-slate-400">
-        Na komputerze możesz też przeciągnąć folder na lewą kolumnę.{' '}
         <button className="underline hover:text-slate-700" onClick={loadDemo}>
-          Wolisz najpierw zobaczyć przykład?
-        </button>
+          Załaduj przykładowy projekt
+        </button>{' '}
+        — by zobaczyć, jak działa Wormhole, lokauty i kalkulatory.
       </p>
     </div>
   );
@@ -566,7 +544,7 @@ export function Workspace() {
         )}
       </div>
 
-      {(busy || dropHint) && (
+      {(busy || dropHint || state.job?.label.startsWith('Wormhole')) && (
         <div className="no-print pointer-events-none absolute inset-0 z-30 flex items-center justify-center">
           <div className="glass flex items-center gap-3 rounded-2xl px-5 py-4 shadow-xl shadow-slate-200/60">
             <div className="relative h-8 w-8">
@@ -574,8 +552,8 @@ export function Workspace() {
               <div className="absolute inset-2 rounded-full bg-orange-500/20" />
             </div>
             <div>
-              <div className="text-sm font-medium text-slate-800">{busy ?? 'Upuść, aby otworzyć tunel Wormhole'}</div>
-              <div className="text-[11px] text-slate-500">{busy ? PROVIDER_LABEL[provider] : 'Obiekt zostanie zmapowany na bieżący dokument'}</div>
+              <div className="text-sm font-medium text-slate-800">{busy ?? state.job?.label ?? 'Upuść, aby otworzyć tunel Wormhole'}</div>
+              <div className="text-[11px] text-slate-500">{busy || state.job ? PROVIDER_LABEL[provider] : 'Obiekt zostanie zmapowany na bieżący dokument'}</div>
             </div>
           </div>
         </div>

@@ -22,16 +22,18 @@ kontekstowe środowisko pracy z wiedzą w estetyce „white laboratory”.
 Bez skonfigurowanego AI aplikacja działa w pełni na **silniku lokalnym** (streszczenia ekstrakcyjne, tabele liczb,
 wszystkie obliczenia statystyczne). Po podłączeniu AI treści generuje model — zawsze jako propozycje do akceptacji.
 
-## Uruchomienie (bez znajomości kodowania)
+## Uruchomienie — iPad i komputer
 
-1. Zainstaluj [Node.js](https://nodejs.org) (wersja 20 lub nowsza) — albo otwórz repozytorium w GitHub Codespaces.
-2. W terminalu, w folderze projektu:
-   ```bash
-   npm install
-   npm run dev
-   ```
-3. Otwórz adres pokazany w terminalu (np. `http://localhost:5173`). W Codespaces ustaw port na **Publiczny**.
-4. Kliknij **„Załaduj przykładowy projekt”**, aby zobaczyć wszystkie funkcje na danych demonstracyjnych.
+Aplikacja działa pod adresem **https://radekflis.github.io/wesa/** (GitHub Pages, gałąź `gh-pages`).
+
+**Instalacja na iPadzie:** otwórz adres w Safari → przycisk Udostępnij → **Do ekranu początkowego**.
+WESA uruchamia się wtedy na pełnym ekranie jak zwykła aplikacja i działa także bez sieci.
+
+**Foldery z Dysku Google:** przycisk **G Dysk** → jednorazowa konfiguracja klucza Google (instrukcja krok po kroku
+jest w aplikacji) → logowanie → wybierz folder → **Importuj**. WESA pobiera cały folder z podfolderami
+(także Dokumenty, Arkusze i Prezentacje Google) i synchronizuje zmiany przyciskiem **⟳**.
+
+Lokalnie dla deweloperów: `npm install && npm run dev`.
 
 ## Podłączenie AI (⚙ w prawym górnym rogu)
 
@@ -49,7 +51,11 @@ wszystkie obliczenia statystyczne). Po podłączeniu AI treści generuje model �
 
 Klucze wpisane w przeglądarce są przechowywane tylko lokalnie (localStorage) i wysyłane bezpośrednio do dostawcy.
 
-## Publikacja na Hostingerze
+## Publikacja
+
+GitHub Pages: zbuduj (`npm run build`) i wypchnij zawartość `dist/` na gałąź `gh-pages`.
+
+### Hostinger
 
 ```bash
 npm run build

@@ -10,12 +10,16 @@ export interface FileRec {
   text: string;
   ocr: boolean;
   error?: string;
+  /** Pochodzenie z Dysku Google — pozwala synchronizować zmiany. */
+  source?: { kind: 'drive'; id: string; rootId: string; modifiedTime: string };
 }
 
 export interface Folder {
   id: string;
   name: string;
   parentId: string | null;
+  /** Folder główny połączony z folderem na Dysku Google. */
+  drive?: { id: string; syncedAt?: number };
 }
 
 export interface SourceRef {
@@ -73,6 +77,7 @@ export interface Settings {
   linterGuards: ProviderId[];
   pCrit: number;
   includeYears: boolean;
+  googleClientId: string;
 }
 
 export interface MarketSeries {

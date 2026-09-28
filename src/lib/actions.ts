@@ -4,6 +4,7 @@ import { useCallback, useMemo, useRef } from 'react';
 import { useStore, newTab, type Action, type State } from './store';
 import type { Block, FileRec, Folder, Panel } from './types';
 import { fromZip, isZip, type IngestItem } from './folders';
+import { DriveAuthError, downloadInBatches, planSync, walkFolder } from './drive';
 import { detectLockouts, extractNumbers, extractText, type Lockout } from './extract';
 import { idb } from './db';
 import { runAi, providerReady, summarize, PROVIDER_LABEL, type AiRequest } from './ai';
@@ -11,16 +12,6 @@ import { block, localReport, markdownToBlocks, numbersTable, planWorkspace, uid,
 import { pearson, type NumberToken } from './stats';
 import { demoFiles } from './demo';
 import { askConfirm } from '../components/Dialogs';
-
-function pathOf(id: string, folders: Folder[]): string[] {
-  const out: string[] = [];
-  let cur = folders.find((f) => f.id === id);
-  while (cur) {
-    out.unshift(cur.name);
-    cur = folders.find((f) => f.id === cur!.parentId);
-  }
-  return out;
-}
 
 export type DragPayload = { kind: 'file' | 'folder' | 'lockout'; id: string };
 export const DRAG_MIME = 'application/x-wesa';
@@ -65,8 +56,8 @@ export function useActions() {
 
   /** Zamienia ścieżkę folderów na id folderu, tworząc brakujące poziomy (reużywa istniejące o tej samej nazwie). */
   const ensurePath = useCallback(
-    (path: string[], created: Folder[]): string | null => {
-      let parent: string | null = null;
+    (path: string[], created: Folder[], start: string | null = null): string | null => {
+      let parent: string | null = start;
       for (const name of path) {
         const known = [...latest.current.folders, ...created];
         const hit = known.find((f) => f.name === name && f.parentId === parent);
@@ -84,7 +75,11 @@ export function useActions() {
   );
 
   const ingest = useCallback(
-    async (list: (File | IngestItem | { name: string; text: string; folder?: string })[], folderId: string | null = null): Promise<FileRec[]> => {
+    async (
+      list: (File | IngestItem | { name: string; text: string; folder?: string })[],
+      folderId: string | null = null,
+      created: Folder[] = [], // współdzielone między porcjami importu, by nie dublować folderów
+    ): Promise<FileRec[]> => {
       // Normalizacja: zwykłe pliki, archiwa ZIP (rozpakowane ze strukturą) i elementy z folderów.
       const items: IngestItem[] = [];
       for (const item of list) {
@@ -107,10 +102,9 @@ export function useActions() {
       if (items.length > 300 && !(await askConfirm(`Zaimportować ${items.length} plików?`, { detail: 'Import może potrwać — OCR skanów działa w przeglądarce.', okLabel: 'Importuj' })))
         return [];
 
-      const created: Folder[] = [];
+      const before = created.length;
       const recs = items.map((it) => {
-        const base = folderId ? [...pathOf(folderId, latest.current.folders)] : [];
-        const target = ensurePath([...base, ...it.path], created);
+        const target = ensurePath(it.path, created, folderId);
         const rec: FileRec = {
           id: uid(),
           name: it.name,
@@ -122,11 +116,12 @@ export function useActions() {
           progress: 'Kolejka ingestii…',
           text: '',
           ocr: false,
+          source: it.source,
         };
         dispatch({ type: 'file/upsert', file: rec });
         return { rec, blob: it.blob };
       });
-      if (created.length) toast(`Utworzono ${created.length} folder(ów) — trwa ingestia ${recs.length} plików`);
+      if (created.length > before) toast(`Utworzono ${created.length - before} folder(ów) — trwa ingestia ${recs.length} plików`);
 
       const out: FileRec[] = [];
       for (const { rec, blob } of recs) {
@@ -149,6 +144,76 @@ export function useActions() {
   );
 
   const loadDemo = useCallback(() => ingest(demoFiles()), [ingest]);
+
+  /** Wspólny rdzeń importu i synchronizacji folderu Dysku Google. */
+  const runDrive = useCallback(
+    async (rootWesaId: string, driveRootId: string, label: string) => {
+      const job = (done: number, total: number, text = label) => dispatch({ type: 'job', job: { label: text, done, total } });
+      try {
+        job(0, 0, `${label}: skanowanie…`);
+        const { entries, skipped } = await walkFolder(driveRootId, (m) => job(0, 0, m));
+        const existing = latest.current.files.filter((f) => f.source?.rootId === driveRootId);
+        const plan = planSync(entries, existing);
+        for (const f of [...plan.remove, ...plan.update.map((u) => u.existing)]) dispatch({ type: 'file/remove', id: f.id });
+        const todo = [...plan.add, ...plan.update.map((u) => u.entry)];
+        const created: Folder[] = [];
+        let failed = 0;
+        await downloadInBatches(
+          todo,
+          4,
+          async (batch) => {
+            await ingest(
+              batch.map(({ entry, blob }) => ({
+                name: entry.importName,
+                blob,
+                path: entry.path,
+                source: { kind: 'drive' as const, id: entry.id, rootId: driveRootId, modifiedTime: entry.modifiedTime },
+              })),
+              rootWesaId,
+              created,
+            );
+          },
+          (done, total) => job(done, total, `${label}: pobieranie`),
+          () => failed++,
+        );
+        dispatch({ type: 'folder/patch', id: rootWesaId, patch: { drive: { id: driveRootId, syncedAt: Date.now() } } });
+        const parts = [
+          plan.add.length && `${plan.add.length} nowych`,
+          plan.update.length && `${plan.update.length} zmienionych`,
+          plan.remove.length && `${plan.remove.length} usuniętych`,
+          skipped.length && `${skipped.length} pominiętych (format)`,
+          failed && `${failed} błędów pobierania`,
+        ].filter(Boolean);
+        toast(`${label}: ${parts.length ? parts.join(', ') : 'bez zmian'}`, failed ? 'error' : 'ok');
+      } catch (e) {
+        toast((e as Error).message, 'error');
+        if (e instanceof DriveAuthError) window.dispatchEvent(new Event('wesa:drive-open'));
+      } finally {
+        dispatch({ type: 'job', job: null });
+      }
+    },
+    [dispatch, ingest, toast],
+  );
+
+  const importDriveFolder = useCallback(
+    async (folder: { id: string; name: string }) => {
+      const existing = latest.current.folders.find((f) => f.drive?.id === folder.id);
+      if (existing) return runDrive(existing.id, folder.id, `Synchronizacja „${folder.name}”`);
+      const root: Folder = { id: uid(), name: folder.name, parentId: null, drive: { id: folder.id } };
+      dispatch({ type: 'folder/add', folder: root });
+      latest.current = { ...latest.current, folders: [...latest.current.folders, root] };
+      return runDrive(root.id, folder.id, `Import „${folder.name}”`);
+    },
+    [dispatch, runDrive],
+  );
+
+  const syncDriveFolder = useCallback(
+    (wesaFolderId: string) => {
+      const f = latest.current.folders.find((x) => x.id === wesaFolderId);
+      if (f?.drive) return runDrive(f.id, f.drive.id, `Synchronizacja „${f.name}”`);
+    },
+    [runDrive],
+  );
 
   const setBlocks = useCallback((tabId: string, blocks: Block[], record = true) => dispatch({ type: 'tab/blocks', id: tabId, blocks, record }), [dispatch]);
 
@@ -204,6 +269,9 @@ export function useActions() {
       }
       files = files.filter((f) => f.status === 'ready');
       if (!files.length) return toast('Brak zindeksowanego tekstu w przeciąganym obiekcie', 'error');
+      window.dispatchEvent(new CustomEvent('wesa:pane', { detail: 'workspace' }));
+      dispatch({ type: 'job', job: { label: 'Wormhole: mapowanie źródła na dokument…', done: 0, total: 0 } });
+      try {
       const src = { fileId: files[0].id, fileName: files.map((f) => f.name).join(', '), excerpt: focus || files[0].text.slice(0, 160) };
       let proposal: Block[];
       if (provider !== 'local') {
@@ -235,8 +303,11 @@ export function useActions() {
       const fresh = latest.current.tabs.find((t) => t.id === tabId)!;
       const at = index ?? fresh.blocks.length;
       setBlocks(tabId, [...fresh.blocks.slice(0, at), ...pending, ...fresh.blocks.slice(at)]);
+      } finally {
+        dispatch({ type: 'job', job: null });
+      }
     },
-    [ai, provider, setBlocks, state, toast],
+    [ai, dispatch, provider, setBlocks, state, toast],
   );
 
   /** Cross-Object Fusion: plik upuszczony na plik → korelacje + synteza w nowym kontekście. */
@@ -270,6 +341,7 @@ export function useActions() {
           ].join('\n'),
         ),
       ];
+      window.dispatchEvent(new CustomEvent('wesa:pane', { detail: 'workspace' }));
       const tab = newTab(`Fuzja: ${a.name.slice(0, 16)} + ${b.name.slice(0, 16)}`, blocks, [
         { id: uid(), kind: 'ocr', fileId: a.id, title: a.name },
         { id: uid(), kind: 'ocr', fileId: b.id, title: b.name },
@@ -313,7 +385,7 @@ export function useActions() {
     [dispatch, state.activeTab, state.tabs],
   );
 
-  return { ingest, loadDemo, spawn, wormhole, fuse, inline, openPanel, setBlocks, toast, ai, provider };
+  return { ingest, loadDemo, importDriveFolder, syncDriveFolder, spawn, wormhole, fuse, inline, openPanel, setBlocks, toast, ai, provider };
 }
 
 export type Dispatch = React.Dispatch<Action>;

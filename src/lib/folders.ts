@@ -4,9 +4,10 @@ export interface IngestItem {
   name: string;
   blob: Blob;
   path: string[]; // nazwy folderów od korzenia, np. ["Projekt Wschód", "Geologia"]
+  source?: { kind: 'drive'; id: string; rootId: string; modifiedTime: string };
 }
 
-export const SUPPORTED = /\.(pdf|png|jpe?g|webp|tiff?|bmp|gif|docx|xlsx|csv|txt|md|json)$/i;
+export const SUPPORTED = /\.(pdf|png|jpe?g|webp|tiff?|bmp|gif|docx|xlsx|pptx|csv|txt|md|json)$/i;
 
 /** Pliki systemowe i ukryte, które pomijamy przy imporcie folderu. */
 function skip(path: string): boolean {

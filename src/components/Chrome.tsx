@@ -243,6 +243,13 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
               <input className="input mt-1 font-mono text-xs" value={s.anthropicModel} onChange={(e) => set({ anthropicModel: e.target.value.trim() })} />
             </label>
           </div>
+          <label className="block text-xs">
+            <span className="font-medium">Dysk Google — identyfikator klienta OAuth</span>
+            <input className="input mt-1 font-mono text-xs" placeholder="…apps.googleusercontent.com" value={s.googleClientId} onChange={(e) => set({ googleClientId: e.target.value.trim() })} />
+            <span className="mt-1 block text-[10.5px] text-slate-400">
+              Instrukcja krok po kroku: przycisk <b>G Dysk</b> w lewej kolumnie → <b>Konfiguracja</b>.
+            </span>
+          </label>
           <p className="rounded-md bg-amber-50 px-2.5 py-2 text-[10.5px] leading-snug text-amber-800">
             Klucze API są przechowywane wyłącznie w tej przeglądarce (localStorage) i wysyłane bezpośrednio do dostawcy. Na współdzielonych urządzeniach używaj webhooka n8n — wtedy klucze zostają na Twoim serwerze.
           </p>

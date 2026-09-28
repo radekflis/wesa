@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState, type DragEvent } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type DragEvent } from 'react';
 import { useStore } from '../lib/store';
 import { useActions, useTokens, DRAG_MIME, type DragPayload } from '../lib/actions';
 import { fromDataTransfer, fromFileList } from '../lib/folders';
 import { uid } from '../lib/spawn';
 import type { FileRec, Folder } from '../lib/types';
-import { askConfirm, askText } from './Dialogs';
+import { askChoice, askConfirm, askText } from './Dialogs';
 
 /**
  * Wybór całego folderu: komputery — zawsze; iPad/iPhone — Safari od iPadOS/iOS 18.4.
@@ -31,71 +31,118 @@ function setPayload(e: DragEvent, p: DragPayload) {
   e.dataTransfer.effectAllowed = 'copyMove';
 }
 
-const ICON: Record<string, string> = { pdf: 'PDF', docx: 'DOC', xlsx: 'XLS', csv: 'CSV', txt: 'TXT', md: 'MD', png: 'IMG', jpg: 'IMG', jpeg: 'IMG', webp: 'IMG' };
+const ICON: Record<string, string> = { pdf: 'PDF', docx: 'DOC', xlsx: 'XLS', pptx: 'PPT', csv: 'CSV', txt: 'TXT', md: 'MD', png: 'IMG', jpg: 'IMG', jpeg: 'IMG', webp: 'IMG' };
+
+/** Tryb „Fuzja z…”: pierwszy plik wybrany, czekamy na stuknięcie drugiego. */
+const FusionCtx = createContext<{ from: string | null; setFrom: (id: string | null) => void }>({ from: null, setFrom: () => {} });
 
 function FileRow({ f, depth }: { f: FileRec; depth: number }) {
   const { state, dispatch } = useStore();
-  const { fuse, openPanel } = useActions();
+  const { fuse, openPanel, wormhole } = useActions();
+  const fusion = useContext(FusionCtx);
   const [over, setOver] = useState(false);
   const ext = f.name.split('.').pop()?.toLowerCase() ?? '';
   const selected = state.selectedFileId === f.id;
+  const open = () => openPanel({ kind: /\.(pdf|png|jpe?g|webp)$/i.test(f.name) ? 'viewer' : 'ocr', fileId: f.id, title: f.name });
+  const tap = () => {
+    if (fusion.from && fusion.from !== f.id) {
+      fuse(fusion.from, f.id);
+      fusion.setFrom(null);
+      return;
+    }
+    dispatch({ type: 'file/select', id: selected ? null : f.id });
+  };
   return (
-    <div
-      draggable={f.status === 'ready'}
-      onDragStart={(e) => setPayload(e, { kind: 'file', id: f.id })}
-      onDragOver={(e) => {
-        if (e.dataTransfer.types.includes(DRAG_MIME)) {
-          e.preventDefault();
-          setOver(true);
-        }
-      }}
-      onDragLeave={() => setOver(false)}
-      onDrop={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setOver(false);
-        const p = readPayload(e);
-        if (p?.kind === 'file' && p.id !== f.id) fuse(p.id, f.id);
-      }}
-      onClick={() => dispatch({ type: 'file/select', id: selected ? null : f.id })}
-      onDoubleClick={() => openPanel({ kind: /\.(pdf|png|jpe?g|webp)$/i.test(f.name) ? 'viewer' : 'ocr', fileId: f.id, title: f.name })}
-      className={`group flex cursor-grab items-center gap-2 rounded-md px-2 py-1.5 text-[13px] transition ${
-        over ? 'bg-orange-50 ring-1 ring-orange-400' : selected ? 'bg-slate-100' : 'hover:bg-slate-50'
-      }`}
-      style={{ paddingLeft: 8 + depth * 14 }}
-      title={over ? 'Upuść: Cross-Object Fusion' : 'Przeciągnij na dokument (Wormhole) lub na inny plik (Fuzja). Dwuklik: otwórz.'}
-    >
-      <span className="w-7 shrink-0 rounded bg-slate-100 py-0.5 text-center font-mono text-[9px] font-medium text-slate-500">{ICON[ext] ?? 'FILE'}</span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-slate-800">{f.name}</span>
-        {f.status !== 'ready' && (
-          <span className={`block truncate text-[10px] ${f.status === 'error' ? 'text-red-600' : 'text-orange-600'}`}>
-            {f.status === 'error' ? f.error : f.progress}
-          </span>
-        )}
-      </span>
-      {f.ocr && <span className="rounded bg-slate-900 px-1 text-[9px] font-medium text-white">OCR</span>}
-      <button
-        className="hidden text-slate-400 hover:text-red-600 group-hover:block"
-        title="Usuń plik"
-        onClick={async (e) => {
-          e.stopPropagation();
-          if (await askConfirm(`Usunąć „${f.name}” z Active Memory?`, { okLabel: 'Usuń', danger: true })) dispatch({ type: 'file/remove', id: f.id });
+    <div>
+      <div
+        draggable={f.status === 'ready'}
+        onDragStart={(e) => setPayload(e, { kind: 'file', id: f.id })}
+        onDragOver={(e) => {
+          if (e.dataTransfer.types.includes(DRAG_MIME)) {
+            e.preventDefault();
+            setOver(true);
+          }
         }}
+        onDragLeave={() => setOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setOver(false);
+          const p = readPayload(e);
+          if (p?.kind === 'file' && p.id !== f.id) fuse(p.id, f.id);
+        }}
+        onClick={tap}
+        onDoubleClick={open}
+        className={`flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-[13px] transition ${
+          over || (fusion.from && fusion.from !== f.id) ? 'bg-orange-50 ring-1 ring-orange-300' : selected ? 'bg-slate-100' : 'hover:bg-slate-50'
+        }`}
+        style={{ paddingLeft: 8 + depth * 14 }}
       >
-        ×
-      </button>
+        <span className="w-8 shrink-0 rounded bg-slate-100 py-0.5 text-center font-mono text-[9px] font-medium text-slate-500">{ICON[ext] ?? 'FILE'}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-slate-800">{f.name}</span>
+          {f.status !== 'ready' && (
+            <span className={`block truncate text-[10px] ${f.status === 'error' ? 'text-red-600' : 'text-orange-600'}`}>{f.status === 'error' ? f.error : f.progress}</span>
+          )}
+        </span>
+        {f.source && <span className="text-[9px] font-bold text-orange-500" title="Z Dysku Google">G</span>}
+        {f.ocr && <span className="rounded bg-slate-900 px-1 text-[9px] font-medium text-white">OCR</span>}
+      </div>
+      {selected && f.status === 'ready' && !fusion.from && (
+        <div className="glass mb-1 ml-2 mt-0.5 flex flex-wrap gap-1 rounded-lg p-1.5" style={{ marginLeft: 8 + depth * 14 }}>
+          <button className="btn px-2 py-1.5" onClick={() => wormhole(state.activeTab, { kind: 'file', id: f.id })}>
+            ⤵ Do dokumentu
+          </button>
+          <button className="btn px-2 py-1.5" onClick={() => fusion.setFrom(f.id)}>
+            ⟷ Fuzja z…
+          </button>
+          <button className="btn px-2 py-1.5" onClick={open}>
+            ◱ Otwórz
+          </button>
+          <button
+            className="btn px-2 py-1.5 text-red-600"
+            onClick={async () => {
+              if (await askConfirm(`Usunąć „${f.name}” z Active Memory?`, { okLabel: 'Usuń', danger: true })) dispatch({ type: 'file/remove', id: f.id });
+            }}
+          >
+            Usuń
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
 function FolderNode({ folder, depth }: { folder: Folder; depth: number }) {
   const { state, dispatch } = useStore();
-  const { ingest } = useActions();
+  const { ingest, wormhole, syncDriveFolder } = useActions();
   const [open, setOpen] = useState(true);
   const [over, setOver] = useState(false);
   const children = state.folders.filter((f) => f.parentId === folder.id);
   const files = state.files.filter((f) => f.folderId === folder.id);
+
+  const menu = async () => {
+    const choice = await askChoice(folder.name, [
+      ...(folder.drive ? [{ key: 'sync', label: '⟳ Synchronizuj z Dyskiem Google' }] : []),
+      { key: 'wormhole', label: '⤵ Wstaw syntezę folderu do dokumentu' },
+      { key: 'sub', label: '+ Nowy podfolder' },
+      { key: 'rename', label: '✎ Zmień nazwę' },
+      { key: 'remove', label: 'Usuń folder', danger: true },
+    ]);
+    if (choice === 'sync') syncDriveFolder(folder.id);
+    if (choice === 'wormhole') wormhole(state.activeTab, { kind: 'folder', id: folder.id });
+    if (choice === 'sub') {
+      const name = await askText('Nazwa podfolderu', '', { okLabel: 'Utwórz' });
+      if (name) dispatch({ type: 'folder/add', folder: { id: uid(), name, parentId: folder.id } });
+    }
+    if (choice === 'rename') {
+      const name = await askText('Nowa nazwa folderu', folder.name, { okLabel: 'Zmień' });
+      if (name) dispatch({ type: 'folder/rename', id: folder.id, name });
+    }
+    if (choice === 'remove' && (await askConfirm(`Usunąć folder „${folder.name}”?`, { detail: 'Pliki z tego folderu wrócą do katalogu głównego.', okLabel: 'Usuń', danger: true })))
+      dispatch({ type: 'folder/remove', id: folder.id });
+  };
+
   return (
     <div>
       <div
@@ -117,45 +164,34 @@ function FolderNode({ folder, depth }: { folder: Folder; depth: number }) {
           const p = readPayload(e);
           if (p?.kind === 'file') dispatch({ type: 'file/patch', id: p.id, patch: { folderId: folder.id } });
         }}
-        className={`group mb-0.5 flex cursor-pointer items-center gap-2 rounded-md bg-orange-500 px-2 py-1.5 text-[13px] font-semibold text-black transition ${over ? 'ring-2 ring-black' : ''}`}
+        className={`mb-0.5 flex cursor-pointer items-center gap-2 rounded-md bg-orange-500 py-1 pl-2 pr-1 text-[13px] font-semibold text-black transition ${over ? 'ring-2 ring-black' : ''}`}
         style={{ marginLeft: depth * 14 }}
         onClick={() => setOpen(!open)}
       >
         <span className="w-3 text-[10px]">{open ? '▾' : '▸'}</span>
-        <span className="flex-1 truncate">{folder.name}</span>
+        <span className="flex-1 truncate py-0.5">{folder.name}</span>
+        {folder.drive && (
+          <button
+            className="rounded px-1.5 py-0.5 text-[11px] font-bold hover:bg-black/10"
+            title={`Synchronizuj z Dyskiem Google${folder.drive.syncedAt ? ` (ostatnio ${new Date(folder.drive.syncedAt).toLocaleString('pl-PL')})` : ''}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              syncDriveFolder(folder.id);
+            }}
+          >
+            ⟳
+          </button>
+        )}
         <span className="text-[10px] font-medium opacity-60">{files.length}</span>
         <button
-          className="hidden text-xs group-hover:block"
-          title="Podfolder"
-          onClick={async (e) => {
+          className="rounded px-2 py-0.5 text-sm leading-none hover:bg-black/10"
+          aria-label="Akcje folderu"
+          onClick={(e) => {
             e.stopPropagation();
-            const name = await askText('Nazwa podfolderu', '', { okLabel: 'Utwórz' });
-            if (name) dispatch({ type: 'folder/add', folder: { id: uid(), name, parentId: folder.id } });
+            menu();
           }}
         >
-          +
-        </button>
-        <button
-          className="hidden text-xs group-hover:block"
-          title="Zmień nazwę"
-          onClick={async (e) => {
-            e.stopPropagation();
-            const name = await askText('Nowa nazwa folderu', folder.name, { okLabel: 'Zmień' });
-            if (name) dispatch({ type: 'folder/rename', id: folder.id, name });
-          }}
-        >
-          ✎
-        </button>
-        <button
-          className="hidden text-xs group-hover:block"
-          title="Usuń folder (pliki wracają do katalogu głównego)"
-          onClick={async (e) => {
-            e.stopPropagation();
-            if (await askConfirm(`Usunąć folder „${folder.name}”?`, { detail: 'Pliki z tego folderu wrócą do katalogu głównego.', okLabel: 'Usuń', danger: true }))
-              dispatch({ type: 'folder/remove', id: folder.id });
-          }}
-        >
-          ×
+          ⋯
         </button>
       </div>
       {open && (
@@ -174,7 +210,8 @@ function FolderNode({ folder, depth }: { folder: Folder; depth: number }) {
 
 function Lockouts() {
   const { lockouts } = useTokens();
-  const { openPanel } = useActions();
+  const { openPanel, wormhole } = useActions();
+  const { state } = useStore();
   return (
     <div className="flex min-h-0 flex-1 flex-col border-t border-slate-100">
       <div className="flex items-center justify-between px-4 pb-2 pt-3">
@@ -202,10 +239,20 @@ function Lockouts() {
                 <span className="f6" />
               </div>
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="truncate text-[12px] font-bold uppercase tracking-wide text-red-600">🚨 Lockout: {l.label}</div>
               <div className="truncate text-[10px] text-slate-500">{l.reason}</div>
             </div>
+            <button
+              className="shrink-0 rounded-md border border-red-100 px-2 py-1 text-[11px] text-red-600 active:bg-red-50"
+              title="Wormhole: wstaw anomalię do dokumentu"
+              onClick={(e) => {
+                e.stopPropagation();
+                wormhole(state.activeTab, { kind: 'lockout', id: l.id });
+              }}
+            >
+              ⤵
+            </button>
           </div>
         ))}
       </div>
@@ -219,7 +266,7 @@ export function Memory() {
   const input = useRef<HTMLInputElement>(null);
   const dirInput = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
-  const [driveHelp, setDriveHelp] = useState(false);
+  const [fusionFrom, setFusionFrom] = useState<string | null>(null);
 
   // Ekran startowy w Live Workspace otwiera te same okna wyboru (zdarzenie wywoływane synchronicznie w geście kliknięcia).
   useEffect(() => {
@@ -243,10 +290,14 @@ export function Memory() {
   const rootFiles = state.files.filter((f) => !f.folderId || !state.folders.some((d) => d.id === f.folderId));
 
   return (
+    <FusionCtx.Provider value={{ from: fusionFrom, setFrom: setFusionFrom }}>
     <aside className="flex h-full min-h-0 flex-col">
-      <div className="flex items-center justify-between px-4 pb-2 pt-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 pb-2 pt-4">
         <span className="label">Active Memory</span>
         <div className="flex gap-1">
+          <button className="btn-primary px-2 py-1" title="Importuj folder z Dysku Google" onClick={() => window.dispatchEvent(new Event('wesa:drive-open'))}>
+            <span className="font-bold text-orange-400">G</span> Dysk
+          </button>
           <button
             className="btn px-2 py-1"
             title="Nowy pusty folder"
@@ -260,7 +311,7 @@ export function Memory() {
           <button className="btn px-2 py-1" title="Wgraj cały folder z podfolderami" onClick={() => window.dispatchEvent(new Event('wesa:pick-folder'))}>
             ↑ Folder
           </button>
-          <button className="btn-primary px-2 py-1" title="Wgraj pliki lub archiwum ZIP" onClick={() => input.current?.click()}>
+          <button className="btn px-2 py-1" title="Wgraj pliki lub archiwum ZIP" onClick={() => input.current?.click()}>
             ↑ Pliki
           </button>
           <input
@@ -268,7 +319,7 @@ export function Memory() {
             type="file"
             multiple
             hidden
-            accept=".pdf,.png,.jpg,.jpeg,.webp,.tif,.tiff,.bmp,.gif,.docx,.xlsx,.csv,.txt,.md,.json,.zip,application/zip"
+            accept=".pdf,.png,.jpg,.jpeg,.webp,.tif,.tiff,.bmp,.gif,.docx,.xlsx,.pptx,.csv,.txt,.md,.json,.zip,application/zip"
             onChange={(e) => {
               // Pole czyścimy dopiero po odczycie — wcześniejsze czyszczenie unieważnia uchwyty plików w Chrome.
               const el = e.currentTarget;
@@ -297,26 +348,26 @@ export function Memory() {
           />
         </div>
       </div>
-      <div className="px-4 pb-2">
-        <button className="text-[11px] text-slate-500 underline-offset-2 hover:text-slate-900 hover:underline" onClick={() => setDriveHelp(!driveHelp)}>
-          {driveHelp ? '▾' : '▸'} Import z Google Drive
-        </button>
-        {driveHelp && (
-          <div className="mt-1.5 rounded-lg border border-slate-100 bg-slate-50/60 p-2.5 text-[11px] leading-relaxed text-slate-600">
-            <ol className="list-decimal space-y-0.5 pl-4">
-              <li>
-                Kliknij <b>↑ Folder</b> i wskaż folder z Dysku Google (iPad: <b>Przeglądaj → Dysk</b>, wejdź do folderu → <b>Otwórz</b>). Wymaga aplikacji Dysk Google włączonej w Plikach; iPadOS 18.4+.
-              </li>
-              <li>
-                Na komputerze możesz też na <b>drive.google.com</b> pobrać folder jako ZIP i wgrać go przez <b>↑ Pliki</b>.
-              </li>
-            </ol>
-            <button className="btn mt-2" onClick={() => window.dispatchEvent(new Event('wesa:pick-folder'))}>
-              Wybierz folder
-            </button>
+      {state.job && (
+        <div className="mx-4 mb-2 rounded-lg border border-orange-100 bg-orange-50/60 px-3 py-2">
+          <div className="truncate text-[11px] font-medium text-orange-800">{state.job.label}</div>
+          <div className="mt-1 h-1 overflow-hidden rounded-full bg-orange-100">
+            <div
+              className={`h-full rounded-full bg-orange-500 transition-all ${state.job.total ? '' : 'w-1/3 animate-pulse'}`}
+              style={state.job.total ? { width: `${(100 * state.job.done) / state.job.total}%` } : undefined}
+            />
           </div>
-        )}
-      </div>
+          {state.job.total > 0 && <div className="mt-0.5 text-[10px] text-orange-700">{state.job.done} / {state.job.total}</div>}
+        </div>
+      )}
+      {fusionFrom && (
+        <div className="mx-4 mb-2 flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-[12px] text-white">
+          <span className="flex-1">⟷ Stuknij drugi plik, aby połączyć z „{state.files.find((f) => f.id === fusionFrom)?.name}”</span>
+          <button className="text-slate-300" onClick={() => setFusionFrom(null)}>
+            Anuluj
+          </button>
+        </div>
+      )}
       <div
         className={`min-h-[140px] flex-[1.3] overflow-y-auto px-3 pb-3 transition ${over ? 'bg-orange-50/60' : ''}`}
         onDragOver={(e) => {
@@ -339,9 +390,12 @@ export function Memory() {
         {state.files.length === 0 && state.folders.length === 0 ? (
           <div className="mt-2 rounded-lg border border-dashed border-slate-200 p-4 text-center">
             <p className="text-xs leading-relaxed text-slate-500">
-              Upuść tu pliki lub całe foldery (PDF, skany, JPEG, DOCX, XLSX, CSV, ZIP). Ingestia i OCR działają w tle — oryginały zostają nienaruszone.
+              Połącz <b>Dysk Google</b> i wybierz folder — albo wgraj pliki / folder z urządzenia. Ingestia i OCR działają w tle.
             </p>
-            <button className="btn mt-3" onClick={loadDemo}>
+            <button className="btn-primary mt-3" onClick={() => window.dispatchEvent(new Event('wesa:drive-open'))}>
+              Folder z Dysku Google
+            </button>
+            <button className="btn mt-2" onClick={loadDemo}>
               Załaduj przykładowy projekt
             </button>
           </div>
@@ -358,5 +412,6 @@ export function Memory() {
       </div>
       <Lockouts />
     </aside>
+    </FusionCtx.Provider>
   );
 }

@@ -14,6 +14,8 @@ export interface State {
   series: MarketSeries[];
   selectedFileId: string | null;
   toasts: { id: string; text: string; tone: 'info' | 'error' | 'ok' }[];
+  /** Długotrwałe zadanie w tle (import / synchronizacja Dysku). */
+  job: { label: string; done: number; total: number } | null;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -26,6 +28,7 @@ export const DEFAULT_SETTINGS: Settings = {
   linterGuards: [],
   pCrit: 1.6,
   includeYears: false,
+  googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '',
 };
 
 export function newTab(title = 'Nowy kontekst', blocks: Block[] = [], panels: Panel[] = []): Tab {
@@ -44,6 +47,7 @@ const initial: State = {
   series: SAMPLE_SERIES,
   selectedFileId: null,
   toasts: [],
+  job: null,
 };
 
 export type Action =
@@ -54,6 +58,7 @@ export type Action =
   | { type: 'file/select'; id: string | null }
   | { type: 'folder/add'; folder: Folder }
   | { type: 'folder/rename'; id: string; name: string }
+  | { type: 'folder/patch'; id: string; patch: Partial<Folder> }
   | { type: 'folder/remove'; id: string }
   | { type: 'project/new'; title: string }
   | { type: 'tab/add'; tab: Tab }
@@ -68,7 +73,8 @@ export type Action =
   | { type: 'settings'; patch: Partial<Settings> }
   | { type: 'series'; series: MarketSeries[] }
   | { type: 'toast'; text: string; tone?: 'info' | 'error' | 'ok' }
-  | { type: 'toast/dismiss'; id: string };
+  | { type: 'toast/dismiss'; id: string }
+  | { type: 'job'; job: State['job'] };
 
 function mapTab(state: State, id: string, fn: (t: Tab) => Tab): State {
   return { ...state, tabs: state.tabs.map((t) => (t.id === id ? fn(t) : t)) };
@@ -95,6 +101,8 @@ function reducer(state: State, a: Action): State {
       return { ...state, folders: [...state.folders, a.folder] };
     case 'folder/rename':
       return { ...state, folders: state.folders.map((f) => (f.id === a.id ? { ...f, name: a.name } : f)) };
+    case 'folder/patch':
+      return { ...state, folders: state.folders.map((f) => (f.id === a.id ? { ...f, ...a.patch } : f)) };
     case 'folder/remove': {
       const doomed = new Set<string>([a.id]);
       let grew = true;
@@ -151,6 +159,8 @@ function reducer(state: State, a: Action): State {
       return { ...state, series: a.series };
     case 'toast':
       return { ...state, toasts: [...state.toasts.slice(-3), { id: uid(), text: a.text, tone: a.tone ?? 'info' }] };
+    case 'job':
+      return { ...state, job: a.job };
     case 'toast/dismiss':
       return { ...state, toasts: state.toasts.filter((t) => t.id !== a.id) };
   }

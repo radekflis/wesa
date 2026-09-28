@@ -224,6 +224,21 @@ export async function extractText(file: Blob, name: string, onProgress: Progress
     const res = await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
     return { text: res.value, ocr: false };
   }
+  if (lower.endsWith('.pptx')) {
+    onProgress('Ekstrakcja prezentacji…');
+    const JSZip = (await import('jszip')).default;
+    const zip = await JSZip.loadAsync(await file.arrayBuffer());
+    const slides = Object.keys(zip.files)
+      .filter((n) => /^ppt\/slides\/slide\d+\.xml$/.test(n))
+      .sort((a, b) => Number(a.match(/\d+/)![0]) - Number(b.match(/\d+/)![0]));
+    const parts: string[] = [];
+    for (const [i, n] of slides.entries()) {
+      const xml = await zip.files[n].async('string');
+      const paras = xml.split('</a:p>').map((p) => [...p.matchAll(/<a:t>([^<]*)<\/a:t>/g)].map((m) => m[1]).join('')).filter(Boolean);
+      parts.push(`[Slajd ${i + 1}]\n${paras.join('\n')}`);
+    }
+    return { text: parts.join('\n\n').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"'), ocr: false };
+  }
   if (/\.xlsx$/.test(lower)) {
     onProgress('Ekstrakcja arkusza…');
     const { default: readXlsx, readSheetNames } = await import('read-excel-file');
