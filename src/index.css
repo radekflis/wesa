@@ -1,0 +1,110 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --lab-line: #e2e8f0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  background: #ffffff;
+  color: #0f172a;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Minimalistyczne, ultra-cienkie suwaki dla estetyki laboratorium */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
+}
+
+@layer components {
+  .glass {
+    @apply border border-slate-200/70 bg-white/70 backdrop-blur-md;
+  }
+  .btn {
+    @apply inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40;
+  }
+  .btn-primary {
+    @apply inline-flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-slate-700 disabled:opacity-40;
+  }
+  .label {
+    @apply text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400;
+  }
+  .input {
+    @apply w-full rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm outline-none transition focus:border-slate-400;
+  }
+  .card {
+    @apply rounded-lg border border-slate-100 bg-white;
+  }
+}
+
+/* Klocki lokautów 3D */
+.cube-scene {
+  perspective: 500px;
+}
+.cube {
+  position: relative;
+  width: 26px;
+  height: 26px;
+  transform-style: preserve-3d;
+  transform: rotateX(-24deg) rotateY(36deg);
+  transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.lockout:hover .cube {
+  transform: rotateX(-24deg) rotateY(216deg);
+}
+.cube > span {
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+.cube .f1 { transform: translateZ(13px); background: #ef4444; }
+.cube .f2 { transform: rotateY(90deg) translateZ(13px); background: #dc2626; }
+.cube .f3 { transform: rotateY(180deg) translateZ(13px); background: #b91c1c; }
+.cube .f4 { transform: rotateY(-90deg) translateZ(13px); background: #b91c1c; }
+.cube .f5 { transform: rotateX(90deg) translateZ(13px); background: #f87171; }
+.cube .f6 { transform: rotateX(-90deg) translateZ(13px); background: #7f1d1d; }
+
+@keyframes wormhole-spin {
+  to { transform: rotate(360deg); }
+}
+.wormhole-ring {
+  animation: wormhole-spin 1.4s linear infinite;
+}
+
+@keyframes pulse-in {
+  from { background-color: #fff7ed; }
+  to { background-color: transparent; }
+}
+.mutated {
+  animation: pulse-in 2.4s ease-out;
+}
+
+[contenteditable]:focus {
+  outline: none;
+}
+[contenteditable][data-placeholder]:empty::before {
+  content: attr(data-placeholder);
+  color: #94a3b8;
+}
+
+@media print {
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+  body, #root { height: auto; overflow: visible; }
+}
