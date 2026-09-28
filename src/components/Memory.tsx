@@ -6,8 +6,16 @@ import { uid } from '../lib/spawn';
 import type { FileRec, Folder } from '../lib/types';
 import { askConfirm, askText } from './Dialogs';
 
-/** iOS/iPadOS Safari nie obsługuje wyboru całego katalogu. */
-const FOLDER_PICKER = !(/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+/**
+ * Wybór całego folderu: komputery — zawsze; iPad/iPhone — Safari od iPadOS/iOS 18.4.
+ * iPad w trybie „wersja na komputer” podaje UA Maca, więc wersję czytamy z „Version/x.y”.
+ */
+const IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+function iosVersion(): number | null {
+  const m = navigator.userAgent.match(/OS (\d+)_(\d+)/) ?? navigator.userAgent.match(/Version\/(\d+)\.(\d+)/);
+  return m ? Number(m[1]) + Number(m[2]) / 100 : null;
+}
+const FOLDER_PICKER = !IOS || (iosVersion() ?? 99) >= 18.04;
 
 function readPayload(e: DragEvent): DragPayload | null {
   try {
@@ -219,9 +227,9 @@ export function Memory() {
     const pickFolder = () => {
       if (FOLDER_PICKER) dirInput.current?.click();
       else {
-        // iPad/iPhone: Safari nie pozwala wybrać folderu — prowadzimy przez ZIP.
-        setDriveHelp(true);
-        toast('Na iPadzie wybierz folder jako plik ZIP (np. „Pobierz” w Google Drive) przyciskiem ↑ Pliki.');
+        // Starszy iPadOS: zamiast folderu otwieramy wybór wielu plików.
+        toast('Twój iPadOS nie pozwala wybrać folderu (wymaga 18.4+). W oknie wyboru wejdź do folderu, stuknij „Wybierz” → „Zaznacz wszystko” → „Otwórz”.');
+        input.current?.click();
       }
     };
     window.addEventListener('wesa:pick-files', pickFiles);
@@ -275,8 +283,15 @@ export function Memory() {
             {...({ webkitdirectory: '', directory: '' } as Record<string, string>)}
             onChange={(e) => {
               const el = e.currentTarget;
-              fromFileList(el.files ? [...el.files] : [])
-                .then((items) => ingest(items))
+              const picked = el.files ? [...el.files] : [];
+              fromFileList(picked)
+                .then((items) => {
+                  if (picked.length === 0) {
+                    toast('Nie odebrano żadnych plików z folderu. Spróbuj „↑ Pliki” i zaznacz wszystkie pliki w folderze.', 'error');
+                    return [];
+                  }
+                  return ingest(items);
+                })
                 .finally(() => (el.value = ''));
             }}
           />
@@ -290,17 +305,14 @@ export function Memory() {
           <div className="mt-1.5 rounded-lg border border-slate-100 bg-slate-50/60 p-2.5 text-[11px] leading-relaxed text-slate-600">
             <ol className="list-decimal space-y-0.5 pl-4">
               <li>
-                Na <b>drive.google.com</b> kliknij folder prawym przyciskiem → <b>Pobierz</b>. Drive spakuje go do ZIP.
+                Kliknij <b>↑ Folder</b> i wskaż folder z Dysku Google (iPad: <b>Przeglądaj → Dysk</b>, wejdź do folderu → <b>Otwórz</b>). Wymaga aplikacji Dysk Google włączonej w Plikach; iPadOS 18.4+.
               </li>
               <li>
-                Wgraj ten ZIP przyciskiem <b>↑ Pliki</b> (albo przeciągnij tutaj). Struktura podfolderów zostanie odtworzona.
+                Na komputerze możesz też na <b>drive.google.com</b> pobrać folder jako ZIP i wgrać go przez <b>↑ Pliki</b>.
               </li>
             </ol>
-            <p className="mt-1.5 text-slate-500">
-              iPad: w aplikacji Pliki włącz Dysk Google jako lokalizację — wtedy wybierzesz pliki z Drive bezpośrednio przez <b>↑ Pliki</b>. Komputer z „Dyskiem Google na komputer”: użyj <b>↑ Folder</b>.
-            </p>
-            <button className="btn mt-2" onClick={() => input.current?.click()}>
-              Wybierz ZIP z Drive
+            <button className="btn mt-2" onClick={() => window.dispatchEvent(new Event('wesa:pick-folder'))}>
+              Wybierz folder
             </button>
           </div>
         )}

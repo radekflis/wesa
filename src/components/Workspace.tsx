@@ -149,7 +149,7 @@ function BlockView({ b, index, update, remove, move, accept, reject }: {
 
 function StartScreen({ title }: { title: string }) {
   const { loadDemo } = useActions();
-  const [drive, setDrive] = useState(false);
+  const [help, setHelp] = useState<'none' | 'ipad' | 'zip'>('none');
   const pick = (kind: 'files' | 'folder') => window.dispatchEvent(new Event(`wesa:pick-${kind}`));
   return (
     <div className="mx-auto max-w-[560px] pt-6">
@@ -157,48 +157,53 @@ function StartScreen({ title }: { title: string }) {
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">{title}</h1>
       <p className="mt-2 text-sm leading-relaxed text-slate-500">Dodaj materiały źródłowe. Pliki zostaną zindeksowane (tekst, OCR skanów), a struktura folderów odtworzona w Active Memory.</p>
       <div className="mt-6 space-y-2">
-        <button onClick={() => setDrive(!drive)} className="flex w-full items-center gap-3 rounded-xl border border-slate-900 bg-slate-900 px-4 py-3 text-left text-white transition hover:bg-slate-800">
-          <span className="grid h-8 w-8 place-items-center rounded-lg bg-orange-500 text-sm font-bold text-black">G</span>
+        <button onClick={() => pick('folder')} className="flex w-full items-center gap-3 rounded-xl border border-slate-900 bg-slate-900 px-4 py-3 text-left text-white transition hover:bg-slate-800">
+          <span className="grid h-8 w-8 place-items-center rounded-lg bg-orange-500 text-base text-black">▣</span>
           <span className="flex-1">
-            <span className="block text-sm font-medium">Dodaj folder z Google Drive</span>
-            <span className="block text-[11px] text-slate-300">Cały folder z podfolderami, przez plik ZIP</span>
+            <span className="block text-sm font-medium">Wybierz cały folder</span>
+            <span className="block text-[11px] text-slate-300">Z podfolderami — także z Dysku Google w aplikacji Pliki</span>
           </span>
-          <span className="text-xs">{drive ? '▾' : '▸'}</span>
         </button>
-        {drive && (
+        <button className="text-[12px] text-slate-500 underline-offset-2 hover:text-slate-900 hover:underline" onClick={() => setHelp(help === 'ipad' ? 'none' : 'ipad')}>
+          {help === 'ipad' ? '▾' : '▸'} Jak wybrać folder z Google Drive na iPadzie?
+        </button>
+        {help === 'ipad' && (
           <div className="rounded-xl border border-slate-200 p-4 text-[13px] leading-relaxed text-slate-600">
             <ol className="list-decimal space-y-1.5 pl-5">
               <li>
-                Otwórz{' '}
-                <a href="https://drive.google.com" target="_blank" rel="noreferrer" className="font-medium text-slate-900 underline">
-                  drive.google.com
-                </a>{' '}
-                w nowej karcie.
+                Jednorazowo: zainstaluj aplikację <b>Dysk Google</b> i zaloguj się. W aplikacji <b>Pliki</b> → <b>Przeglądaj</b> → <b>⋯</b> → <b>Edycja</b> włącz <b>Dysk</b>.
               </li>
               <li>
-                Kliknij folder projektu prawym przyciskiem (iPad: <b>⋯</b>) → <b>Pobierz</b>. Drive spakuje folder do pliku ZIP i zapisze go w Pobranych.
+                Stuknij <b>„Wybierz cały folder”</b> powyżej → <b>Przeglądaj</b> → <b>Dysk</b>.
               </li>
-              <li>Wróć tutaj i wybierz ten plik ZIP:</li>
+              <li>
+                Wejdź <i>do</i> folderu projektu i stuknij <b>Otwórz</b> — zaimportuje się cały folder z podfolderami.
+              </li>
             </ol>
-            <button className="btn-primary mt-3" onClick={() => pick('files')}>
-              Wybierz ZIP z Drive
-            </button>
-            <p className="mt-3 text-[11px] text-slate-400">Duże foldery Drive dzieli na kilka ZIP-ów (…-001.zip, …-002.zip) — wybierz je wszystkie naraz.</p>
+            <p className="mt-2 text-[11px] text-slate-400">Wymaga iPadOS 18.4 lub nowszego. Na starszym systemie zaznacz pliki w folderze przez „Wybierz” → „Zaznacz wszystko”.</p>
           </div>
         )}
-        <div className="grid grid-cols-2 gap-2">
-          <button onClick={() => pick('folder')} className="rounded-xl border border-slate-200 px-4 py-3 text-left transition hover:border-slate-400">
-            <span className="block text-sm font-medium">Folder z komputera</span>
-            <span className="block text-[11px] text-slate-500">także z „Dysku Google na komputer”</span>
-          </button>
+        <div className="grid grid-cols-2 gap-2 pt-1">
           <button onClick={() => pick('files')} className="rounded-xl border border-slate-200 px-4 py-3 text-left transition hover:border-slate-400">
             <span className="block text-sm font-medium">Pojedyncze pliki</span>
-            <span className="block text-[11px] text-slate-500">PDF, skany, DOCX, XLSX, CSV, ZIP</span>
+            <span className="block text-[11px] text-slate-500">PDF, skany, DOCX, XLSX, CSV</span>
+          </button>
+          <button onClick={() => setHelp(help === 'zip' ? 'none' : 'zip')} className="rounded-xl border border-slate-200 px-4 py-3 text-left transition hover:border-slate-400">
+            <span className="block text-sm font-medium">Archiwum ZIP</span>
+            <span className="block text-[11px] text-slate-500">np. folder pobrany z drive.google.com</span>
           </button>
         </div>
+        {help === 'zip' && (
+          <div className="rounded-xl border border-slate-200 p-4 text-[13px] leading-relaxed text-slate-600">
+            Na komputerze: <b>drive.google.com</b> → prawy przycisk na folderze → <b>Pobierz</b>. Potem wybierz ZIP:
+            <button className="btn-primary ml-2" onClick={() => pick('files')}>
+              Wybierz ZIP
+            </button>
+          </div>
+        )}
       </div>
       <p className="mt-4 text-[11px] text-slate-400">
-        Możesz też przeciągnąć folder lub pliki na lewą kolumnę.{' '}
+        Na komputerze możesz też przeciągnąć folder na lewą kolumnę.{' '}
         <button className="underline hover:text-slate-700" onClick={loadDemo}>
           Wolisz najpierw zobaczyć przykład?
         </button>
@@ -437,8 +442,8 @@ export function Workspace() {
                 <button className="btn" onClick={() => commit([block('heading', tab.title, { level: 1, origin: 'user' }), block('text', '', { origin: 'user' })])}>
                   Zacznij pusty dokument
                 </button>
-                <button className="btn" onClick={() => window.dispatchEvent(new Event('wesa:pick-files'))}>
-                  + Dodaj ZIP z Google Drive / pliki
+                <button className="btn" onClick={() => window.dispatchEvent(new Event('wesa:pick-folder'))}>
+                  + Dodaj folder
                 </button>
               </div>
             </div>
