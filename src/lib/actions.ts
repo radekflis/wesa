@@ -2,13 +2,24 @@
 
 import { useCallback, useMemo, useRef } from 'react';
 import { useStore, newTab, type Action, type State } from './store';
-import type { Block, FileRec, Panel } from './types';
+import type { Block, FileRec, Folder, Panel } from './types';
+import { fromZip, isZip, type IngestItem } from './folders';
 import { detectLockouts, extractNumbers, extractText, type Lockout } from './extract';
 import { idb } from './db';
 import { runAi, providerReady, summarize, PROVIDER_LABEL, type AiRequest } from './ai';
 import { block, localReport, markdownToBlocks, numbersTable, planWorkspace, uid, fmt } from './spawn';
 import { pearson, type NumberToken } from './stats';
 import { demoFiles } from './demo';
+
+function pathOf(id: string, folders: Folder[]): string[] {
+  const out: string[] = [];
+  let cur = folders.find((f) => f.id === id);
+  while (cur) {
+    out.unshift(cur.name);
+    cur = folders.find((f) => f.id === cur!.parentId);
+  }
+  return out;
+}
 
 export type DragPayload = { kind: 'file' | 'folder' | 'lockout'; id: string };
 export const DRAG_MIME = 'application/x-wesa';
@@ -51,28 +62,59 @@ export function useActions() {
     [provider, state.settings, toast],
   );
 
-  const ingest = useCallback(
-    async (list: File[] | { name: string; text: string; folder?: string }[], folderId: string | null = null): Promise<FileRec[]> => {
-      const out: FileRec[] = [];
-      for (const item of list) {
-        const id = uid();
-        const isNative = item instanceof File;
-        const blob = isNative ? item : new Blob([item.text], { type: 'text/plain' });
-        let targetFolder = folderId;
-        if (!isNative && item.folder) {
-          const existing = state.folders.find((f) => f.name === item.folder && f.parentId === null);
-          if (existing) targetFolder = existing.id;
-          else {
-            targetFolder = uid();
-            dispatch({ type: 'folder/add', folder: { id: targetFolder, name: item.folder, parentId: null } });
-          }
+  /** Zamienia ścieżkę folderów na id folderu, tworząc brakujące poziomy (reużywa istniejące o tej samej nazwie). */
+  const ensurePath = useCallback(
+    (path: string[], created: Folder[]): string | null => {
+      let parent: string | null = null;
+      for (const name of path) {
+        const known = [...latest.current.folders, ...created];
+        const hit = known.find((f) => f.name === name && f.parentId === parent);
+        if (hit) parent = hit.id;
+        else {
+          const folder: Folder = { id: uid(), name, parentId: parent };
+          created.push(folder);
+          dispatch({ type: 'folder/add', folder });
+          parent = folder.id;
         }
+      }
+      return parent;
+    },
+    [dispatch],
+  );
+
+  const ingest = useCallback(
+    async (list: (File | IngestItem | { name: string; text: string; folder?: string })[], folderId: string | null = null): Promise<FileRec[]> => {
+      // Normalizacja: zwykłe pliki, archiwa ZIP (rozpakowane ze strukturą) i elementy z folderów.
+      const items: IngestItem[] = [];
+      for (const item of list) {
+        if (item instanceof File) {
+          if (isZip(item)) {
+            toast(`Rozpakowywanie „${item.name}”…`);
+            try {
+              items.push(...(await fromZip(item)));
+            } catch (e) {
+              toast(`Nie udało się otworzyć archiwum „${item.name}”: ${(e as Error).message}`, 'error');
+            }
+          } else items.push({ name: item.name, blob: item, path: [] });
+        } else if ('blob' in item) items.push(item);
+        else items.push({ name: item.name, blob: new Blob([item.text], { type: 'text/plain' }), path: item.folder ? [item.folder] : [] });
+      }
+      if (items.length === 0) {
+        toast('Brak obsługiwanych plików (PDF, obrazy, DOCX, XLSX, CSV, TXT).', 'error');
+        return [];
+      }
+      if (items.length > 300 && !confirm(`Import ${items.length} plików może potrwać (OCR skanów działa w przeglądarce). Kontynuować?`)) return [];
+
+      const created: Folder[] = [];
+      const recs = items.map((it) => {
+        const base = folderId ? [...pathOf(folderId, latest.current.folders)] : [];
+        const target = ensurePath([...base, ...it.path], created);
         const rec: FileRec = {
-          id,
-          name: item.name,
-          mime: blob.type || 'application/octet-stream',
-          size: blob.size,
-          folderId: targetFolder,
+          id: uid(),
+          name: it.name,
+          mime: it.blob.type || 'application/octet-stream',
+          size: it.blob.size,
+          folderId: target,
           addedAt: Date.now(),
           status: 'processing',
           progress: 'Kolejka ingestii…',
@@ -80,21 +122,28 @@ export function useActions() {
           ocr: false,
         };
         dispatch({ type: 'file/upsert', file: rec });
+        return { rec, blob: it.blob };
+      });
+      if (created.length) toast(`Utworzono ${created.length} folder(ów) — trwa ingestia ${recs.length} plików`);
+
+      const out: FileRec[] = [];
+      for (const { rec, blob } of recs) {
+        const id = rec.id;
         await idb.put('blobs', id, blob);
         try {
-          const res = await extractText(blob, item.name, (progress) => dispatch({ type: 'file/patch', id, patch: { progress } }));
+          const res = await extractText(blob, rec.name, (progress) => dispatch({ type: 'file/patch', id, patch: { progress } }));
           const done = { ...rec, status: 'ready' as const, progress: undefined, text: res.text, ocr: res.ocr };
           dispatch({ type: 'file/upsert', file: done });
           out.push(done);
         } catch (e) {
           dispatch({ type: 'file/patch', id, patch: { status: 'error', error: (e as Error).message, progress: undefined } });
-          toast(`Nie udało się przetworzyć „${item.name}”: ${(e as Error).message}`, 'error');
+          toast(`Nie udało się przetworzyć „${rec.name}”: ${(e as Error).message}`, 'error');
         }
       }
       if (out.length) toast(`Zindeksowano ${out.length} plik(ów) w Active Memory`, 'ok');
       return out;
     },
-    [dispatch, state.folders, toast],
+    [dispatch, ensurePath, toast],
   );
 
   const loadDemo = useCallback(() => ingest(demoFiles()), [ingest]);

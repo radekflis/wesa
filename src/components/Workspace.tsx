@@ -5,6 +5,7 @@ import { block, blocksToMarkdown, markdownToBlocks, METHODOLOGY, METHODOLOGY_TIT
 import { PROVIDER_LABEL } from '../lib/ai';
 import type { Block } from '../lib/types';
 import { PanelView } from './Panels';
+import { fromDataTransfer } from '../lib/folders';
 import { LineForecast } from './Charts';
 
 /** Edytowalny fragment tekstu bez „skakania” kursora: DOM aktualizujemy tylko, gdy element nie ma fokusu. */
@@ -212,9 +213,9 @@ export function Workspace() {
     const target = (e.target as HTMLElement).closest('[data-index]') as HTMLElement | null;
     const index = target ? Number(target.dataset.index) + 1 : undefined;
     if (e.dataTransfer.files.length) {
-      const files = [...e.dataTransfer.files];
+      const pending = fromDataTransfer(e.dataTransfer); // wpisy trzeba odczytać synchronicznie, w trakcie zdarzenia drop
       await run('Ingestia + Wormhole…', async () => {
-        const recs = await ingest(files);
+        const recs = await ingest(await pending);
         for (const r of recs) await wormhole(tab.id, { kind: 'file', id: r.id }, index);
       });
       return;

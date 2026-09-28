@@ -7,7 +7,7 @@ kontekstowe środowisko pracy z wiedzą w estetyce „white laboratory”.
 
 | Warstwa | Funkcje |
 |---|---|
-| **Active Memory** (lewa kolumna) | Foldery (pomarańczowe tło, czarne litery), wgrywanie PDF / skanów / JPEG / DOCX / XLSX / CSV / TXT. Ingestia działa w tle: warstwa tekstowa PDF, **OCR (Tesseract, PL+EN)** dla skanów i zdjęć. Oryginały zostają nienaruszone (IndexedDB przeglądarki). |
+| **Active Memory** (lewa kolumna) | Foldery (pomarańczowe tło, czarne litery), wgrywanie PDF / skanów / JPEG / DOCX / XLSX / CSV / TXT — pojedynczo, **całymi folderami** (przycisk „↑ Folder” lub przeciągnięcie) albo jako **ZIP** (np. folder pobrany z Google Drive) z zachowaniem podfolderów. Ingestia działa w tle: warstwa tekstowa PDF, **OCR (Tesseract, PL+EN)** dla skanów i zdjęć. Oryginały zostają nienaruszone (IndexedDB przeglądarki). |
 | **Lokauty 3D** | Czerwone klocki 3D — automatycznie wykryte anomalie (np. `ZINC 45.2%`). Kliknięcie = deep-link do zdania w źródle, przeciągnięcie na dokument = Wormhole. |
 | **Live Workspace** (środek) | Modularny edytor bloków (tekst, nagłówki, listy, edytowalne tabele, wykresy), historia cofnij/ponów, identyfikowalność źródeł, eksport `.md` i PDF (druk). |
 | **Konsola** (dół) | *Nowa przestrzeń* — intencja spawnuje kontekst z panelami (podgląd PDF, warstwa OCR, arkusz DCF/NPV/IRR, wykres) i szkic raportu. *Polecenie do dokumentu* — dopisuje sekcje do bieżącego raportu. |

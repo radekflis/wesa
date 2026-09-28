@@ -1,6 +1,7 @@
 import { useRef, useState, type DragEvent } from 'react';
 import { useStore } from '../lib/store';
 import { useActions, useTokens, DRAG_MIME, type DragPayload } from '../lib/actions';
+import { fromDataTransfer, fromFileList } from '../lib/folders';
 import { uid } from '../lib/spawn';
 import type { FileRec, Folder } from '../lib/types';
 
@@ -78,6 +79,7 @@ function FileRow({ f, depth }: { f: FileRec; depth: number }) {
 
 function FolderNode({ folder, depth }: { folder: Folder; depth: number }) {
   const { state, dispatch } = useStore();
+  const { ingest } = useActions();
   const [open, setOpen] = useState(true);
   const [over, setOver] = useState(false);
   const children = state.folders.filter((f) => f.parentId === folder.id);
@@ -96,6 +98,10 @@ function FolderNode({ folder, depth }: { folder: Folder; depth: number }) {
           e.preventDefault();
           e.stopPropagation();
           setOver(false);
+          if (e.dataTransfer.files.length) {
+            fromDataTransfer(e.dataTransfer).then((items) => ingest(items, folder.id));
+            return;
+          }
           const p = readPayload(e);
           if (p?.kind === 'file') dispatch({ type: 'file/patch', id: p.id, patch: { folderId: folder.id } });
         }}
@@ -198,7 +204,9 @@ export function Memory() {
   const { state, dispatch } = useStore();
   const { ingest, loadDemo } = useActions();
   const input = useRef<HTMLInputElement>(null);
+  const dirInput = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
+  const [driveHelp, setDriveHelp] = useState(false);
   const rootFolders = state.folders.filter((f) => f.parentId === null);
   const rootFiles = state.files.filter((f) => !f.folderId || !state.folders.some((d) => d.id === f.folderId));
 
@@ -209,29 +217,69 @@ export function Memory() {
         <div className="flex gap-1">
           <button
             className="btn px-2 py-1"
-            title="Nowy folder"
+            title="Nowy pusty folder"
             onClick={() => {
               const name = prompt('Nazwa folderu');
               if (name) dispatch({ type: 'folder/add', folder: { id: uid(), name, parentId: null } });
             }}
           >
-            + Folder
+            +
           </button>
-          <button className="btn-primary px-2 py-1" onClick={() => input.current?.click()}>
-            ↑ Wgraj
+          <button className="btn px-2 py-1" title="Wgraj cały folder z podfolderami" onClick={() => dirInput.current?.click()}>
+            ↑ Folder
+          </button>
+          <button className="btn-primary px-2 py-1" title="Wgraj pliki lub archiwum ZIP" onClick={() => input.current?.click()}>
+            ↑ Pliki
           </button>
           <input
             ref={input}
             type="file"
             multiple
             hidden
-            accept=".pdf,.png,.jpg,.jpeg,.webp,.tif,.tiff,.bmp,.docx,.xlsx,.csv,.txt,.md,.json"
+            accept=".pdf,.png,.jpg,.jpeg,.webp,.tif,.tiff,.bmp,.gif,.docx,.xlsx,.csv,.txt,.md,.json,.zip,application/zip"
             onChange={(e) => {
-              if (e.target.files) ingest([...e.target.files]);
-              e.target.value = '';
+              // Pole czyścimy dopiero po odczycie — wcześniejsze czyszczenie unieważnia uchwyty plików w Chrome.
+              const el = e.currentTarget;
+              ingest(el.files ? [...el.files] : []).finally(() => (el.value = ''));
+            }}
+          />
+          <input
+            ref={dirInput}
+            type="file"
+            multiple
+            hidden
+            {...({ webkitdirectory: '', directory: '' } as Record<string, string>)}
+            onChange={(e) => {
+              const el = e.currentTarget;
+              fromFileList(el.files ? [...el.files] : [])
+                .then((items) => ingest(items))
+                .finally(() => (el.value = ''));
             }}
           />
         </div>
+      </div>
+      <div className="px-4 pb-2">
+        <button className="text-[11px] text-slate-500 underline-offset-2 hover:text-slate-900 hover:underline" onClick={() => setDriveHelp(!driveHelp)}>
+          {driveHelp ? '▾' : '▸'} Import z Google Drive
+        </button>
+        {driveHelp && (
+          <div className="mt-1.5 rounded-lg border border-slate-100 bg-slate-50/60 p-2.5 text-[11px] leading-relaxed text-slate-600">
+            <ol className="list-decimal space-y-0.5 pl-4">
+              <li>
+                Na <b>drive.google.com</b> kliknij folder prawym przyciskiem → <b>Pobierz</b>. Drive spakuje go do ZIP.
+              </li>
+              <li>
+                Wgraj ten ZIP przyciskiem <b>↑ Pliki</b> (albo przeciągnij tutaj). Struktura podfolderów zostanie odtworzona.
+              </li>
+            </ol>
+            <p className="mt-1.5 text-slate-500">
+              iPad: w aplikacji Pliki włącz Dysk Google jako lokalizację — wtedy wybierzesz pliki z Drive bezpośrednio przez <b>↑ Pliki</b>. Komputer z „Dyskiem Google na komputer”: użyj <b>↑ Folder</b>.
+            </p>
+            <button className="btn mt-2" onClick={() => input.current?.click()}>
+              Wybierz ZIP z Drive
+            </button>
+          </div>
+        )}
       </div>
       <div
         className={`min-h-[140px] flex-[1.3] overflow-y-auto px-3 pb-3 transition ${over ? 'bg-orange-50/60' : ''}`}
@@ -245,7 +293,7 @@ export function Memory() {
         onDrop={(e) => {
           e.preventDefault();
           setOver(false);
-          if (e.dataTransfer.files.length) ingest([...e.dataTransfer.files]);
+          if (e.dataTransfer.files.length) fromDataTransfer(e.dataTransfer).then((items) => ingest(items));
           else {
             const p = readPayload(e);
             if (p?.kind === 'file') dispatch({ type: 'file/patch', id: p.id, patch: { folderId: null } });
@@ -255,7 +303,7 @@ export function Memory() {
         {state.files.length === 0 && state.folders.length === 0 ? (
           <div className="mt-2 rounded-lg border border-dashed border-slate-200 p-4 text-center">
             <p className="text-xs leading-relaxed text-slate-500">
-              Upuść tu pliki (PDF, skany, JPEG, DOCX, XLSX, CSV). Ingestia i OCR działają w tle — oryginały zostają nienaruszone.
+              Upuść tu pliki lub całe foldery (PDF, skany, JPEG, DOCX, XLSX, CSV, ZIP). Ingestia i OCR działają w tle — oryginały zostają nienaruszone.
             </p>
             <button className="btn mt-3" onClick={loadDemo}>
               Załaduj przykładowy projekt
