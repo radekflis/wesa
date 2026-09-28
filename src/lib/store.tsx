@@ -55,6 +55,7 @@ export type Action =
   | { type: 'folder/add'; folder: Folder }
   | { type: 'folder/rename'; id: string; name: string }
   | { type: 'folder/remove'; id: string }
+  | { type: 'project/new'; title: string }
   | { type: 'tab/add'; tab: Tab }
   | { type: 'tab/close'; id: string }
   | { type: 'tab/activate'; id: string }
@@ -106,6 +107,11 @@ function reducer(state: State, a: Action): State {
         folders: state.folders.filter((f) => !doomed.has(f.id)),
         files: state.files.map((f) => (f.folderId && doomed.has(f.folderId) ? { ...f, folderId: null } : f)),
       };
+    }
+    case 'project/new': {
+      // Czysty projekt: bez plików, folderów i kontekstów. Ustawienia AI i dane rynkowe zostają.
+      const t = newTab(a.title);
+      return { ...state, files: [], folders: [], tabs: [t], activeTab: t.id, selectedFileId: null };
     }
     case 'tab/add':
       return { ...state, tabs: [...state.tabs, a.tab], activeTab: a.tab.id };

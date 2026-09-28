@@ -78,6 +78,19 @@ export function TopBar({ onPalette, onSettings }: { onPalette: () => void; onSet
       <button onClick={onPalette} className="btn md:hidden" aria-label="Szukaj">
         ⌕
       </button>
+      <button
+        className="btn hidden sm:inline-flex"
+        title="Wyczyść pliki, foldery i dokumenty — zacznij nowy projekt"
+        onClick={() => {
+          const hasData = state.files.length > 0 || state.tabs.some((t) => t.blocks.length > 0);
+          if (hasData && !confirm('Rozpocząć nowy projekt? Wszystkie pliki, foldery i dokumenty z tej przeglądarki zostaną usunięte (ustawienia AI zostają). Jeśli chcesz je zachować, najpierw zrób „Eksport kopii” w ustawieniach.')) return;
+          const title = prompt('Nazwa nowego projektu', 'Nowy projekt');
+          if (title === null) return;
+          dispatch({ type: 'project/new', title: title.trim() || 'Nowy projekt' });
+        }}
+      >
+        ✦ Nowy projekt
+      </button>
       <button onClick={onSettings} className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] text-slate-500 hover:bg-slate-50" title="Ustawienia jądra AI">
         <span className={`h-2 w-2 rounded-full ${provider === 'local' ? 'bg-slate-300' : 'bg-emerald-500'}`} />
         <span className="hidden lg:inline">{provider === 'local' ? 'Tryb lokalny' : 'WESA Kernel Synced'}</span>

@@ -1,4 +1,4 @@
-import { useRef, useState, type DragEvent } from 'react';
+import { useEffect, useRef, useState, type DragEvent } from 'react';
 import { useStore } from '../lib/store';
 import { useActions, useTokens, DRAG_MIME, type DragPayload } from '../lib/actions';
 import { fromDataTransfer, fromFileList } from '../lib/folders';
@@ -207,6 +207,18 @@ export function Memory() {
   const dirInput = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
   const [driveHelp, setDriveHelp] = useState(false);
+
+  // Ekran startowy w Live Workspace otwiera te same okna wyboru (zdarzenie wywoływane synchronicznie w geście kliknięcia).
+  useEffect(() => {
+    const pickFiles = () => input.current?.click();
+    const pickFolder = () => dirInput.current?.click();
+    window.addEventListener('wesa:pick-files', pickFiles);
+    window.addEventListener('wesa:pick-folder', pickFolder);
+    return () => {
+      window.removeEventListener('wesa:pick-files', pickFiles);
+      window.removeEventListener('wesa:pick-folder', pickFolder);
+    };
+  }, []);
   const rootFolders = state.folders.filter((f) => f.parentId === null);
   const rootFiles = state.files.filter((f) => !f.folderId || !state.folders.some((d) => d.id === f.folderId));
 

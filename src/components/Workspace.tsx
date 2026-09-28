@@ -147,6 +147,66 @@ function BlockView({ b, index, update, remove, move, accept, reject }: {
   );
 }
 
+function StartScreen({ title }: { title: string }) {
+  const { loadDemo } = useActions();
+  const [drive, setDrive] = useState(false);
+  const pick = (kind: 'files' | 'folder') => window.dispatchEvent(new Event(`wesa:pick-${kind}`));
+  return (
+    <div className="mx-auto max-w-[560px] pt-6">
+      <div className="label">Nowy projekt</div>
+      <h1 className="mt-1 text-2xl font-semibold tracking-tight">{title}</h1>
+      <p className="mt-2 text-sm leading-relaxed text-slate-500">Dodaj materiały źródłowe. Pliki zostaną zindeksowane (tekst, OCR skanów), a struktura folderów odtworzona w Active Memory.</p>
+      <div className="mt-6 space-y-2">
+        <button onClick={() => setDrive(!drive)} className="flex w-full items-center gap-3 rounded-xl border border-slate-900 bg-slate-900 px-4 py-3 text-left text-white transition hover:bg-slate-800">
+          <span className="grid h-8 w-8 place-items-center rounded-lg bg-orange-500 text-sm font-bold text-black">G</span>
+          <span className="flex-1">
+            <span className="block text-sm font-medium">Dodaj folder z Google Drive</span>
+            <span className="block text-[11px] text-slate-300">Cały folder z podfolderami, przez plik ZIP</span>
+          </span>
+          <span className="text-xs">{drive ? '▾' : '▸'}</span>
+        </button>
+        {drive && (
+          <div className="rounded-xl border border-slate-200 p-4 text-[13px] leading-relaxed text-slate-600">
+            <ol className="list-decimal space-y-1.5 pl-5">
+              <li>
+                Otwórz{' '}
+                <a href="https://drive.google.com" target="_blank" rel="noreferrer" className="font-medium text-slate-900 underline">
+                  drive.google.com
+                </a>{' '}
+                w nowej karcie.
+              </li>
+              <li>
+                Kliknij folder projektu prawym przyciskiem (iPad: <b>⋯</b>) → <b>Pobierz</b>. Drive spakuje folder do pliku ZIP i zapisze go w Pobranych.
+              </li>
+              <li>Wróć tutaj i wybierz ten plik ZIP:</li>
+            </ol>
+            <button className="btn-primary mt-3" onClick={() => pick('files')}>
+              Wybierz ZIP z Drive
+            </button>
+            <p className="mt-3 text-[11px] text-slate-400">Duże foldery Drive dzieli na kilka ZIP-ów (…-001.zip, …-002.zip) — wybierz je wszystkie naraz.</p>
+          </div>
+        )}
+        <div className="grid grid-cols-2 gap-2">
+          <button onClick={() => pick('folder')} className="rounded-xl border border-slate-200 px-4 py-3 text-left transition hover:border-slate-400">
+            <span className="block text-sm font-medium">Folder z komputera</span>
+            <span className="block text-[11px] text-slate-500">także z „Dysku Google na komputer”</span>
+          </button>
+          <button onClick={() => pick('files')} className="rounded-xl border border-slate-200 px-4 py-3 text-left transition hover:border-slate-400">
+            <span className="block text-sm font-medium">Pojedyncze pliki</span>
+            <span className="block text-[11px] text-slate-500">PDF, skany, DOCX, XLSX, CSV, ZIP</span>
+          </button>
+        </div>
+      </div>
+      <p className="mt-4 text-[11px] text-slate-400">
+        Możesz też przeciągnąć folder lub pliki na lewą kolumnę.{' '}
+        <button className="underline hover:text-slate-700" onClick={loadDemo}>
+          Wolisz najpierw zobaczyć przykład?
+        </button>
+      </p>
+    </div>
+  );
+}
+
 const INLINE_ACTIONS: [string, string][] = [
   ['summarize', 'Streść'],
   ['expand', 'Rozwiń'],
@@ -366,13 +426,14 @@ export function Workspace() {
         onMouseUp={onMouseUp}
       >
         <article className="mx-auto max-w-[760px] pl-6 pt-4">
-          {blocks.length === 0 && (
+          {blocks.length === 0 && state.files.length === 0 && <StartScreen title={tab.title} />}
+          {blocks.length === 0 && state.files.length > 0 && (
             <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center">
-              <div className="text-sm font-medium text-slate-700">Pusta przestrzeń operacyjna</div>
+              <div className="text-sm font-medium text-slate-700">Pliki są w Active Memory — co dalej?</div>
               <p className="mx-auto mt-2 max-w-md text-xs leading-relaxed text-slate-500">
-                Wpisz intencję w konsoli poniżej (np. <i>„raport dla inwestora — złoże niklu, wycena OCR”</i>), przeciągnij tu plik, folder lub czerwony klocek lokautu — albo zacznij pisać.
+                Wpisz intencję w konsoli poniżej (np. <i>„raport dla inwestora — złoże niklu, wycena”</i>), przeciągnij tu plik, folder lub czerwony klocek lokautu — albo zacznij pisać.
               </p>
-              <button className="btn mt-4" onClick={() => commit([block('heading', 'Nowy dokument', { level: 1, origin: 'user' }), block('text', '', { origin: 'user' })])}>
+              <button className="btn mt-4" onClick={() => commit([block('heading', tab.title, { level: 1, origin: 'user' }), block('text', '', { origin: 'user' })])}>
                 Zacznij pusty dokument
               </button>
             </div>
