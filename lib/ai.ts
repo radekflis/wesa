@@ -3,7 +3,7 @@ export type Provider = 'gemini' | 'claude';
 function modelFor(provider: Provider) {
   return provider === 'gemini'
     ? process.env.GEMINI_MODEL || 'gemini-3.8-flash'
-    : process.env.CLAUDE_MODEL || 'claude-sonnet-5-5';
+    : process.env.CLAUDE_MODEL || 'claude-opus-5-5';
 }
 
 export async function runAI(provider: Provider, prompt: string, context: string) {
