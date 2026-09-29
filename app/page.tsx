@@ -1,0 +1,31 @@
+'use client';
+import {useState} from 'react';
+
+type Block={id:number,title:string,text:string,kind:'doc'|'data'|'ai'};
+const files=['Geological Core Data.pdf','Lithium Valuation.xlsx','Financial Model.xlsx','Corporate Structure.pdf'];
+const initial:Block[]=[
+ {id:1,title:'Executive Valuation Note',text:'Select a source, run contextual AI, then insert the verified result directly into this workspace.',kind:'doc'},
+ {id:2,title:'Informational Pressure',text:'Narrative concentration, source density and valuation assumptions are ready for analysis.',kind:'data'}
+];
+
+export default function Home(){
+ const [query,setQuery]=useState(''); const [spawned,setSpawned]=useState(false);
+ const [provider,setProvider]=useState<'claude'|'gemini'>('claude'); const [prompt,setPrompt]=useState('');
+ const [busy,setBusy]=useState(false); const [notice,setNotice]=useState('Ready'); const [blocks,setBlocks]=useState(initial);
+ const [dropped,setDropped]=useState('');
+ const context='Active workspace: WESA ALAW. Sources: Geological Core Data.pdf, Lithium Valuation.xlsx, Financial Model.xlsx.';
+ const search=()=>{if(/lithium/i.test(query)&&/ocr/i.test(query)){setSpawned(true);setNotice('Semantic Workspace Spawned — PDF + OCR + Valuation Grid')}};
+ const ask=async()=>{if(!prompt.trim())return;setBusy(true);setNotice(provider==='claude'?'Claude is processing contextual workspace…':'Gemini is processing contextual workspace…');
+  try{const r=await fetch('/api/ai',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({provider,prompt,context})});const j=await r.json();if(!r.ok)throw new Error(j.error);setBlocks(b=>[...b,{id:Date.now(),title:provider==='claude'?'Claude Result':'Gemini Result',text:j.result,kind:'ai'}]);setPrompt('');setNotice('AI result inserted as an editable workspace block.')}catch(e:any){setNotice(e.message||'AI request failed.')}finally{setBusy(false)}};
+ const drop=(e:React.DragEvent)=>{e.preventDefault();const n=e.dataTransfer.getData('text/plain')||'Source document';setDropped(n);setBlocks(b=>[...b,{id:Date.now(),title:'Wormhole Injection',text:`Context fused from ${n}. Verify source mapping before committing.`,kind:'data'}]);setNotice('Wormhole: context fusion complete.')};
+ return <main onDrop={drop} onDragOver={e=>e.preventDefault()}>
+  <header className="top"><div className="brand"><span className="mark">W</span><div><b>WESA ALAW</b><small>Operating System for Knowledge Work</small></div></div><div className="tabs"><span className="tab active">Lithium Valuation OCR</span><span className="tab">Geological Core Data</span><button className="icon">＋</button></div><div className="topright"><span className="live">● LIVE</span><button className="ghost" onClick={()=>setNotice('Server-side API keys only. Configure them in Vercel Environment Variables.')}>Settings</button></div></header>
+  <section className="command"><input value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.key==='Enter'&&search()} placeholder="⌘ K  Search memory, documents, data, workflows…"/><span>Enter ↵</span></section>
+  {notice!=='Ready'&&<div className="notice">{notice}</div>}
+  <div className="grid">
+   <aside className="panel memory"><div className="panelhead"><b>ACTIVE MEMORY</b><span>⌁ semantic</span></div><div className="sectionlabel">WORKSPACE</div><div className="folder">⌄ <b>WESA Master File</b></div>{files.map(f=><div key={f} draggable onDragStart={e=>e.dataTransfer.setData('text/plain',f)} className="file">{f.endsWith('.pdf')?'▧':'▦'} {f}</div>)}<div className="sectionlabel">3D LOCKOUTS</div>{['Structure','Financials','Source Mapping'].map(x=><div className="lock" key={x}>◈ {x}<span>LOCKED</span></div>)}<div className="memoryfoot">4 sources indexed · OCR ready</div></aside>
+   <section className="workspace panel"><div className="panelhead"><b>LIVE WORKSPACE</b><span>{spawned?'3 active modules':'Adaptive canvas'}</span></div>{spawned&&<div className="spawn"><div><b>Semantic Workspace</b><small>lithium · valuation · OCR</small></div><div className="chips"><i>PDF Viewer</i><i>OCR Live Data</i><i>Valuation Grid</i></div></div>}<div className="blocks">{blocks.map(b=><article className={`block ${b.kind}`} key={b.id}><div className="blocktitle"><b>{b.title}</b><span>⋯</span></div><div contentEditable suppressContentEditableWarning className="editable">{b.text}</div></article>)}{dropped&&<article className="block worm"><div className="blocktitle"><b>Wormhole Context</b><span>REAL-TIME</span></div><div className="editable">{dropped} is now available as active operational context.</div></article>}</div><div className="composer"><div className="providers"><button className={provider==='claude'?'sel':''} onClick={()=>setProvider('claude')}>Claude</button><button className={provider==='gemini'?'sel':''} onClick={()=>setProvider('gemini')}>Gemini</button></div><textarea value={prompt} onChange={e=>setPrompt(e.target.value)} placeholder="Ask contextual AI to analyze, extract, compare or mutate the active workspace…"/><button disabled={busy} onClick={ask}>{busy?'…':'Run AI ↗'}</button></div></section>
+   <aside className="panel tools"><div className="panelhead"><b>CONTEXTUAL TOOLS</b><span>AI REACTIVE</span></div><div className="tool"><div className="tooltitle">OCR LIVE DATA <em>READY</em></div><p>Document text extraction and source mapping.</p><div className="minirow"><b>2,481</b><span>tokens indexed</span></div></div><div className="tool"><div className="tooltitle">DESCRIPTIVE STATISTICS</div><div className="chart">{[35,58,78,46,90,66,82].map((h,i)=><i key={i} style={{height:`${h}%`}}/>)}</div><p>Median 74.2 · dispersion 11.8 · n=148</p></div><div className="tool"><div className="tooltitle">BENFORD / SOURCE SIGNAL</div><div className="ring">92<span>%</span></div><p>Informational pressure / anomaly monitor</p></div><div className="tool locked"><div className="tooltitle">WESA METHODOLOGY <em>LOCKED</em></div><p>Traceability, assumptions, evidence chain and real-time mutation history.</p></div></aside>
+  </div><footer><span>WESA ALAW v1.0 · Vercel-native</span><span>Server-side AI · no n8n</span></footer>
+ </main>
+}
